@@ -1,0 +1,1014 @@
+html<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>College Career Compass v2.0.7</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        @media (max-width: 768px) {
+            .tab-button { font-size: 0.75rem; padding: 0.75rem 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const CareerPlanner = () => {
+          const [activeTab, setActiveTab] = useState(0);
+          const [showResults, setShowResults] = useState(false);
+          const [showDisclaimer, setShowDisclaimer] = useState(true);
+          const [showAbout, setShowAbout] = useState(false);
+          
+          const [tab1, setTab1] = useState({ hsGPA: '', apClasses: '', zipCode: '' });
+          const [tab2, setTab2] = useState({ degreeTarget: '', advancedDegree: '', collegeTier: '' });
+          const [tab3, setTab3] = useState({ 
+            familyIncome: '',
+            fundingFamily: false,
+            fundingLoans: false,
+            fundingGrants: false,
+            fundingWorkStudy: false,
+            fundingScholarships: false,
+            schoolCostPreference: '',
+            workStudy: '',
+            internships: '',
+            scholarshipEffort: ''
+          });
+          const [tab4, setTab4] = useState({
+            workWith: '',
+            workStructure: '',
+            workSatisfaction: '',
+            drugUse: '',
+            alcoholUse: '',
+            socialBehavior: '',
+            courseSelectionStrategy: ''
+          });
+          const [tab5, setTab5] = useState({
+            housingPlan: '',
+            numberOfChildren: '',
+            lifestyle: '',
+            financialDiscipline: '',
+            mobility: '',
+            dualIncome: false
+          });
+          
+          const [results, setResults] = useState(null);
+          const [careerFit, setCareerFit] = useState(null);
+          const [yearByYear, setYearByYear] = useState(null);
+          const [showYearByYear, setShowYearByYear] = useState(false);
+
+          const analyzeCareerFit = (workWith, workStructure, workSatisfaction, degree) => {
+            const fits = {
+              'Computer Science': {
+                workWith: { 'Data & systems': 2, 'People': 0, 'Hands-on tasks': 1 },
+                workStructure: { 'Structured': 1, 'Flexible': 2, 'Creative': 2 },
+                workSatisfaction: { 'Helping others': 0, 'Solving problems': 2, 'Creating things': 2 },
+                reason: 'requires analytical thinking and problem-solving with data and systems'
+              },
+              'Engineering/Science': {
+                workWith: { 'Data & systems': 2, 'People': 0, 'Hands-on tasks': 2 },
+                workStructure: { 'Structured': 2, 'Flexible': 1, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 2, 'Creating things': 1 },
+                reason: 'involves systematic problem-solving and hands-on technical work'
+              },
+              'Business': {
+                workWith: { 'Data & systems': 1, 'People': 2, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 1, 'Flexible': 2, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 1, 'Creating things': 1 },
+                reason: 'focuses on working with people and flexible problem-solving'
+              },
+              'Medical/Healthcare': {
+                workWith: { 'Data & systems': 1, 'People': 2, 'Hands-on tasks': 1 },
+                workStructure: { 'Structured': 2, 'Flexible': 0, 'Creative': 0 },
+                workSatisfaction: { 'Helping others': 2, 'Solving problems': 1, 'Creating things': 0 },
+                reason: 'centers on helping people with structured protocols'
+              },
+              'Teaching': {
+                workWith: { 'Data & systems': 0, 'People': 2, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 2, 'Flexible': 1, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 2, 'Solving problems': 0, 'Creating things': 1 },
+                reason: 'is about helping people within structured educational frameworks'
+              },
+              'Liberal Arts': {
+                workWith: { 'Data & systems': 1, 'People': 1, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 0, 'Flexible': 1, 'Creative': 2 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 1, 'Creating things': 2 },
+                reason: 'emphasizes creative thinking and diverse perspectives'
+              }
+            };
+
+            const degreeData = fits[degree] || fits['Business'];
+            const score1 = degreeData.workWith[workWith] || 0;
+            const score2 = degreeData.workStructure[workStructure] || 0;
+            const score3 = degreeData.workSatisfaction[workSatisfaction] || 0;
+            const totalScore = score1 + score2 + score3;
+
+            let message = '';
+            let colorClass = '';
+            
+            if (totalScore >= 5) {
+              message = `🎯 Strong alignment: Your work preferences tend to align well with ${degree}, which ${degreeData.reason}. Many people with similar preferences find success in this field.`;
+              colorClass = 'bg-green-50 border-green-400';
+            } else if (totalScore >= 3) {
+              message = `👍 Good alignment: Your preferences generally fit ${degree}, which ${degreeData.reason}. Talk to people in the field to learn more about day-to-day realities.`;
+              colorClass = 'bg-blue-50 border-blue-300';
+            } else if (totalScore >= 1) {
+              message = `⚠️ Worth exploring carefully: ${degree} ${degreeData.reason}, which differs somewhat from your stated preferences. Consider internships or informational interviews before committing.`;
+              colorClass = 'bg-yellow-50 border-yellow-400';
+            } else {
+              message = `💭 Consider carefully: Your preferences may not typically align with ${degree}, which ${degreeData.reason}. This doesn't mean you can't succeed, but research the field thoroughly and talk to professionals.`;
+              colorClass = 'bg-orange-50 border-orange-400';
+            }
+
+            return { fitScore: totalScore * 12, message, colorClass };
+          };javascript          const runSimulation = () => {
+            if (!tab1.hsGPA || !tab1.apClasses || !tab2.degreeTarget || !tab2.advancedDegree || 
+                !tab2.collegeTier || !tab3.familyIncome || !tab4.workWith || !tab5.housingPlan) {
+              alert('Please complete all tabs before running simulation');
+              return;
+            }
+
+            const fit = analyzeCareerFit(tab4.workWith, tab4.workStructure, tab4.workSatisfaction, tab2.degreeTarget);
+            setCareerFit(fit);
+
+            let projectedGPA = parseFloat(tab1.hsGPA);
+            if (tab4.drugUse === 'Some') projectedGPA -= 0.5;
+            else if (tab4.drugUse === 'High') projectedGPA -= 1.2;
+            if (tab4.alcoholUse === 'Some') projectedGPA -= 0.25;
+            else if (tab4.alcoholUse === 'High') projectedGPA -= 0.6;
+            if (tab4.socialBehavior === 'Some') projectedGPA -= 0.25;
+            else if (tab4.socialBehavior === 'High') projectedGPA -= 0.5;
+            if (tab4.courseSelectionStrategy === 'Proactive') projectedGPA += 0.1;
+            else if (tab4.courseSelectionStrategy === 'Reactive') projectedGPA -= 0.15;
+            else projectedGPA -= 0.4;
+            projectedGPA = Math.max(0, Math.min(4.0, projectedGPA));
+
+            const tierCosts = {
+              'Ivy League / Top 20 ($60K+)': 60000,
+              'Elite Out-of-State ($35K)': 35000,
+              'State Flagship ($25K)': 25000,
+              'Regional State ($18K)': 18000,
+              'Community College ($4K)': 4000
+            };
+            let annualCost = tierCosts[tab2.collegeTier] || 25000;
+            
+            if (tab3.schoolCostPreference === 'Highest ranked regardless of cost') annualCost *= 1.3;
+            else if (tab3.schoolCostPreference === 'Minimize cost as top priority') annualCost *= 0.75;
+
+            const income = parseInt(tab3.familyIncome.replace(/[^0-9]/g, '')) || 100000;
+            let grantPct = 0;
+            if (income < 30000) grantPct = 0.7;
+            else if (income < 60000) grantPct = 0.5;
+            else if (income < 100000) grantPct = 0.3;
+            else if (income < 150000) grantPct = 0.15;
+            
+            const grantAid = annualCost * grantPct;
+
+            let workStudyAmt = 0;
+            if (tab3.workStudy === 'Yes, 10-15 hrs/week') workStudyAmt = 4000;
+            else if (tab3.workStudy === 'Limited (5-10 hrs/week)') workStudyAmt = 2000;
+
+            let scholarshipAmt = 0;
+            if (tab3.scholarshipEffort === 'Aggressive (30+ apps)') scholarshipAmt = 12000;
+            else if (tab3.scholarshipEffort === 'Moderate (10-30 apps)') scholarshipAmt = 6000;
+            else if (tab3.scholarshipEffort === 'Minimal (1-10 apps)') scholarshipAmt = 2000;
+
+            let internshipAmt = 0;
+            if (tab3.internships === '3+ internships') internshipAmt = 15000;
+            else if (tab3.internships === '2 internships') internshipAmt = 10000;
+            else if (tab3.internships === '1 internship') internshipAmt = 5000;
+
+            const apClasses = parseInt(tab1.apClasses) || 0;
+            let fourYearProb = 0.5;
+            if (tab4.courseSelectionStrategy === 'Proactive' && apClasses >= 3) fourYearProb = 0.9;
+            else if (tab4.courseSelectionStrategy === 'Proactive') fourYearProb = 0.8;
+            else if (tab4.courseSelectionStrategy === 'Reactive' && apClasses >= 3) fourYearProb = 0.6;
+            else if (tab4.courseSelectionStrategy === 'Reactive') fourYearProb = 0.45;
+            else fourYearProb = 0.3;
+
+            const graduationYears = Math.random() < fourYearProb ? 4 : 5;
+
+            let yearlyDebt = annualCost - grantAid - workStudyAmt - (scholarshipAmt / 4);
+            let totalDebt = Math.max(0, yearlyDebt * graduationYears - internshipAmt);
+
+            if (tab2.advancedDegree === 'MBA') totalDebt += 120000;
+            else if (tab2.advancedDegree === 'Masters') totalDebt += 80000;
+            else if (tab2.advancedDegree === 'PhD') totalDebt += 100000;
+
+            if (tab3.fundingFamily && !tab3.fundingLoans && !tab3.fundingGrants && 
+                !tab3.fundingWorkStudy && !tab3.fundingScholarships) {
+              totalDebt = 0;
+            }
+
+            const salaryBase = {
+              'Computer Science': 85000,
+              'Engineering/Science': 75000,
+              'Business': 60000,
+              'Medical/Healthcare': 65000,
+              'Teaching': 42000,
+              'Liberal Arts': 45000
+            };
+            let baseSalary = salaryBase[tab2.degreeTarget] || 60000;
+
+            const gpaOffset = (projectedGPA - 3.2) / 0.1;
+            baseSalary *= Math.pow(1.025, gpaOffset);
+
+            if (tab2.advancedDegree === 'MBA') baseSalary *= 1.4;
+            else if (tab2.advancedDegree === 'Masters') baseSalary *= 1.25;
+            else if (tab2.advancedDegree === 'PhD') baseSalary *= 1.35;
+
+            const startingSalary = baseSalary;
+
+            const growthBase = {
+              'Computer Science': 0.08,
+              'Engineering/Science': 0.06,
+              'Business': 0.05,
+              'Medical/Healthcare': 0.06,
+              'Teaching': 0.03,
+              'Liberal Arts': 0.04
+            };
+            let growthRate = growthBase[tab2.degreeTarget] || 0.05;
+
+            if (projectedGPA >= 3.6) growthRate *= 1.1;
+            else if (projectedGPA >= 3.2) growthRate *= 1.05;
+            else if (projectedGPA >= 3.0) growthRate *= 1.0;
+            else if (projectedGPA >= 2.6) growthRate *= 0.9;
+            else growthRate *= 0.8;
+
+            if (tab5.mobility === 'Very mobile') growthRate *= 1.1;
+            else if (tab5.mobility === 'Somewhat mobile') growthRate *= 1.05;
+            else if (tab5.mobility === 'Must stay local') growthRate *= 0.9;javascript            let totalEarnings = 0;
+            let totalAfterTaxIncome = 0;
+            let currentSalary = startingSalary;
+            const yearlyData = [];
+            let investmentBalance = 0;
+            let cumulativeCash = 0;
+            let bankruptcyWarning = false;
+            
+            let numChildren = 0;
+            if (tab5.numberOfChildren === '1') numChildren = 2;
+            else if (tab5.numberOfChildren === '3') numChildren = 3;
+            else if (tab5.numberOfChildren === '5') numChildren = 5;
+            
+            const annualLoanPayment = totalDebt / 10;
+            
+            for (let year = 0; year < 40; year++) {
+              const age = 22 + year;
+              const grossSalary = currentSalary;
+              totalEarnings += grossSalary;
+              
+              let afterTaxIncome = grossSalary * 0.75;
+              
+              let mortgageTaxSavings = 0;
+              if (tab5.housingPlan === 'Own home') {
+                mortgageTaxSavings = grossSalary * 0.0175;
+                afterTaxIncome += mortgageTaxSavings;
+              }
+              
+              let childTaxCredit = 0;
+              if (year >= 5 && year <= 22 && numChildren > 0) {
+                childTaxCredit = 2000 * numChildren;
+                afterTaxIncome += childTaxCredit;
+              }
+              
+              let partnerIncome = 0;
+              if (tab5.dualIncome) {
+                partnerIncome = afterTaxIncome * 0.50;
+                afterTaxIncome += partnerIncome;
+              }
+              
+              const loanPayment = (year < 10) ? annualLoanPayment : 0;
+              
+              let baseLiving = 0;
+              if (afterTaxIncome < 40000) {
+                baseLiving = afterTaxIncome * 0.95;
+              } else if (afterTaxIncome < 60000) {
+                baseLiving = 35000 + (afterTaxIncome - 40000) * 0.85;
+              } else if (afterTaxIncome < 100000) {
+                baseLiving = 52000 + (afterTaxIncome - 60000) * 0.70;
+              } else {
+                baseLiving = 80000 + (afterTaxIncome - 100000) * 0.50;
+              }
+              
+              let housingMult = 1.0;
+              if (tab5.housingPlan === 'Rent long-term') housingMult = 1.15;
+              else if (tab5.housingPlan === 'High-cost urban') housingMult = 1.40;
+              
+              const childCosts = (year >= 5 && year <= 22 && numChildren > 0) ? 25000 * numChildren : 0;
+              
+              let lifestyleMult = 1.0;
+              if (tab5.lifestyle === 'Frugal') lifestyleMult = 0.85;
+              else if (tab5.lifestyle === 'Comfortable') lifestyleMult = 1.2;
+              else if (tab5.lifestyle === 'Affluent') lifestyleMult = 1.5;
+              
+              const cumulativeLiving = (baseLiving * housingMult * lifestyleMult) + childCosts;
+              
+              const discretionary = afterTaxIncome - loanPayment - cumulativeLiving;
+              
+              let investmentRate = 0.04;
+              if (year <= 4) investmentRate = 0.04;
+              else if (year <= 14 && numChildren > 0) investmentRate = 0.02;
+              else if (year <= 14) investmentRate = 0.04;
+              else if (year <= 24) investmentRate = 0.03;
+              else if (year <= 34) investmentRate = 0.05;
+              else investmentRate = 0.10;
+              
+              if (tab5.financialDiscipline === 'High') investmentRate *= 1.2;
+              else if (tab5.financialDiscipline === 'Low') investmentRate *= 0.5;
+              else if (tab5.financialDiscipline === 'Very Low') investmentRate = 0;
+              
+              const amountInvested = Math.max(0, discretionary * investmentRate);
+              
+              const yearsToRetirement = 40 - year;
+              const futureValue = amountInvested * Math.pow(1.05, yearsToRetirement);
+              investmentBalance += futureValue;
+              
+              if (cumulativeCash < 0) {
+                cumulativeCash = cumulativeCash * 1.20;
+              } else if (cumulativeCash > 0) {
+                cumulativeCash = cumulativeCash * 1.01;
+              }
+              
+              if (discretionary > 0) {
+                const leftover = discretionary - amountInvested;
+                cumulativeCash += leftover;
+              } else {
+                cumulativeCash += discretionary;
+              }
+              
+              if (cumulativeCash < -250000 || (afterTaxIncome > 0 && cumulativeCash < -(afterTaxIncome * 2))) {
+                bankruptcyWarning = true;
+              }
+              
+              yearlyData.push({
+                year: year + 1,
+                age,
+                grossSalary: Math.round(grossSalary),
+                afterTaxIncome: Math.round(afterTaxIncome),
+                loanPayment: Math.round(loanPayment),
+                baseLiving: Math.round(baseLiving),
+                housingMult: housingMult.toFixed(2),
+                childCosts: Math.round(childCosts),
+                lifestyleMult: lifestyleMult.toFixed(2),
+                cumulativeLiving: Math.round(cumulativeLiving),
+                discretionary: Math.round(discretionary),
+                investmentRate: (investmentRate * 100).toFixed(1) + '%',
+                amountInvested: Math.round(amountInvested),
+                cumulativeCash: Math.round(cumulativeCash),
+                investmentBalance: Math.round(investmentBalance)
+              });
+              
+              totalAfterTaxIncome += afterTaxIncome;
+              currentSalary *= (1 + growthRate);
+            }
+
+            const npv = totalAfterTaxIncome - (totalDebt * 1.5);
+            const netWorthAt65 = investmentBalance + cumulativeCash - totalDebt;
+            
+            setYearByYear(yearlyData);
+
+            setResults({
+              projectedGPA,
+              startingSalary,
+              totalDebt,
+              graduationYears,
+              npv,
+              netWorthAt65,
+              lifetimeEarnings: totalEarnings,
+              fourYearProb,
+              bankruptcyWarning,
+              finalCumulativeCash: cumulativeCash
+            });
+
+            setShowResults(true);
+          };javascript          if (showAbout) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
+                <div className="max-w-4xl bg-white rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-4">About This Tool</h1>
+                  <p className="text-sm text-gray-600 mb-6">Version 2.0.7 - February 2026</p>
+                  
+                  <div className="space-y-4 text-gray-700">
+                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+                      <p className="font-bold text-blue-900 mb-2">📚 Model Background</p>
+                      <p className="text-sm">Built on 20 years of experience hiring and mentoring college graduates and interns. Projections reflect real hiring practices and career progression.</p>
+                    </div>
+
+                    <div className="bg-green-50 border-l-4 border-green-400 p-4">
+                      <p className="font-bold text-green-900 mb-2">🎯 Statistical Approach</p>
+                      <p className="text-sm">Uses evidence-based projections to estimate outcomes. These are educational estimates, not guarantees.</p>
+                    </div>
+
+                    <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                      <p className="font-bold text-red-900 mb-2">🚨 Important Disclaimer</p>
+                      <p className="text-sm mb-2"><strong>USE AT YOUR OWN RISK.</strong> This tool provides educational projections only. Your actual outcomes depend on effort, aptitude, and circumstances beyond the model's scope.</p>
+                      <p className="text-sm">Not a substitute for professional guidance from counselors, financial advisors, or mental health professionals. Use with trusted adult oversight.</p>
+                    </div>
+
+                    <div className="bg-purple-50 border-l-4 border-purple-400 p-4">
+                      <p className="font-bold text-purple-900 mb-2">💪 Take Charge of Your Future</p>
+                      <p className="text-sm mb-2">High school is the critical time when YOU must take charge of your own career path. The decisions you make now will directly impact your life path and determine how much joy or pain you experience as an adult.</p>
+                      <p className="text-sm">This is not someone else's responsibility - it's yours. Plan wisely.</p>
+                    </div>
+
+                    <div className="bg-gray-50 border-l-4 border-gray-400 p-4">
+                      <p className="font-bold text-gray-900 mb-2">📖 Open Source & Free</p>
+                      <p className="text-sm">Free to use with open-source code. Developers who enhance this tool are encouraged to keep it free and share improvements.</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => setShowAbout(false)} className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold">
+                    Close
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (showDisclaimer) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
+                <div className="max-w-3xl bg-white rounded-2xl shadow-2xl p-8">
+                  <div className="text-center mb-6">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">College Career Compass</h1>
+                    <p className="text-lg text-gray-600">Evidence-Based College & Career Planning</p>
+                    <p className="text-sm text-gray-500 mt-2">Version 2.0.7</p>
+                  </div>
+
+                  <div className="space-y-4 text-gray-700">
+                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+                      <p className="font-bold text-blue-900 mb-2">📊 Based on Real Experience</p>
+                      <p className="text-sm">Built on 20 years of hiring and mentoring college graduates. These projections reflect actual career patterns.</p>
+                    </div>
+
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                      <p className="font-bold text-yellow-900 mb-2">⚠️ Educational Tool Only</p>
+                      <p className="text-sm">Provides projections, not guarantees. Your outcomes depend on your effort, choices, and circumstances.</p>
+                    </div>
+
+                    <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4">
+                      <p className="font-bold text-indigo-900 mb-2">💪 Take Ownership</p>
+                      <p className="text-sm">High school is when you should take responsibility for planning your future. Decisions now impact the next 60+ years.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex flex-col gap-3">
+                    <button onClick={() => setShowDisclaimer(false)} className="w-full py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-lg">
+                      I Understand - Continue
+                    </button>
+                    <button onClick={() => { setShowDisclaimer(false); setShowAbout(true); }} className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
+                      Read Full ABOUT
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-8 px-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h1 className="text-3xl font-bold mb-2">College Career Compass</h1>
+                        <p className="text-indigo-100">Evidence-based planning tool</p>
+                      </div>
+                      <div className="text-right">
+                        <button onClick={() => setShowAbout(true)} className="px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-sm font-semibold">
+                          ABOUT
+                        </button>
+                        <p className="text-xs text-indigo-200 mt-1">v2.0.7</p>
+                      </div>
+                    </div>
+                  </div>javascript                  {!showResults ? (
+                    <>
+                      <div className="flex border-b overflow-x-auto">
+                        {['Academics', 'Degree & School', 'Finances', 'Work & Behavior', 'Life Planning'].map((tab, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveTab(idx)}
+                            className={`tab-button flex-1 py-4 px-2 text-sm font-semibold transition-all whitespace-nowrap ${
+                              activeTab === idx ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {idx + 1}. {tab}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="p-6">
+                        {activeTab === 0 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Current High School GPA (Unweighted)</label>
+                              <select value={tab1.hsGPA} onChange={(e) => setTab1({...tab1, hsGPA: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select GPA</option>
+                                <option value="4.0">4.0</option>
+                                <option value="3.8">3.8-3.99</option>
+                                <option value="3.5">3.5-3.79</option>
+                                <option value="3.3">3.3-3.49</option>
+                                <option value="3.0">3.0-3.29</option>
+                                <option value="2.7">2.7-2.99</option>
+                                <option value="2.5">2.5-2.69</option>
+                                <option value="2.0">2.0-2.29</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">AP/Honors Classes Taken</label>
+                              <select value={tab1.apClasses} onChange={(e) => setTab1({...tab1, apClasses: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select number</option>
+                                <option value="0">0 (None)</option>
+                                <option value="1">1-2</option>
+                                <option value="3">3-4</option>
+                                <option value="5">5-7</option>
+                                <option value="8">8+</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Home Zip Code</label>
+                              <input type="text" value={tab1.zipCode} onChange={(e) => setTab1({...tab1, zipCode: e.target.value})} placeholder="5-digit zip" maxLength={5} className="w-full p-2 border rounded" />
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 1 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Target Degree Field</label>
+                              <select value={tab2.degreeTarget} onChange={(e) => setTab2({...tab2, degreeTarget: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select field</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Engineering/Science">Engineering/Science</option>
+                                <option value="Business">Business</option>
+                                <option value="Medical/Healthcare">Medical/Healthcare</option>
+                                <option value="Teaching">Teaching</option>
+                                <option value="Liberal Arts">Liberal Arts</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Advanced Degree Plans</label>
+                              <select value={tab2.advancedDegree} onChange={(e) => setTab2({...tab2, advancedDegree: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Bachelor's Degree Only">Bachelor's Degree Only</option>
+                                <option value="MBA">MBA</option>
+                                <option value="Masters">Master's Degree</option>
+                                <option value="PhD">PhD</option>
+                                <option value="Pre-Med">Pre-Med (Bachelor's Only)</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">College Tier Preference</label>
+                              <select value={tab2.collegeTier} onChange={(e) => setTab2({...tab2, collegeTier: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select tier</option>
+                                <option value="Ivy League / Top 20 ($60K+)">Ivy League / Top 20 ($60K+)</option>
+                                <option value="Elite Out-of-State ($35K)">Elite Out-of-State ($35K)</option>
+                                <option value="State Flagship ($25K)">State Flagship ($25K)</option>
+                                <option value="Regional State ($18K)">Regional State ($18K)</option>
+                                <option value="Community College ($4K)">Community College ($4K)</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 2 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Family Current Annual Income</label>
+                              <select value={tab3.familyIncome} onChange={(e) => setTab3({...tab3, familyIncome: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select range</option>
+                                <option value="0-30000">Under $30K</option>
+                                <option value="30000-60000">$30K-$60K</option>
+                                <option value="60000-100000">$60K-$100K</option>
+                                <option value="100000-150000">$100K-$150K</option>
+                                <option value="150000+">$150K+</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-2">How will you pay for college? (Check all that apply)</label>
+                              <div className="space-y-2">
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingFamily} onChange={(e) => setTab3({...tab3, fundingFamily: e.target.checked})} className="mr-2" />
+                                  <span>Family contributions</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingGrants} onChange={(e) => setTab3({...tab3, fundingGrants: e.target.checked})} className="mr-2" />
+                                  <span>Federal/State grants (need-based aid)</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingScholarships} onChange={(e) => setTab3({...tab3, fundingScholarships: e.target.checked})} className="mr-2" />
+                                  <span>Scholarships (merit-based)</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingWorkStudy} onChange={(e) => setTab3({...tab3, fundingWorkStudy: e.target.checked})} className="mr-2" />
+                                  <span>Work-study earnings</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingLoans} onChange={(e) => setTab3({...tab3, fundingLoans: e.target.checked})} className="mr-2" />
+                                  <span>Student loans</span>
+                                </label>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">School Cost Preference</label>
+                              <select value={tab3.schoolCostPreference} onChange={(e) => setTab3({...tab3, schoolCostPreference: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Highest ranked regardless of cost">Highest ranked regardless of cost</option>
+                                <option value="Balance of quality and cost">Balance of quality and cost</option>
+                                <option value="Minimize cost as top priority">Minimize cost as top priority</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Work-Study During School</label>
+                              <select value={tab3.workStudy} onChange={(e) => setTab3({...tab3, workStudy: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Yes, 10-15 hrs/week">Yes, 10-15 hrs/week</option>
+                                <option value="Limited (5-10 hrs/week)">Limited (5-10 hrs/week)</option>
+                                <option value="No work during school">No work during school</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Planned Paid Internships</label>
+                              <select value={tab3.internships} onChange={(e) => setTab3({...tab3, internships: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="3+ internships">3+ internships</option>
+                                <option value="2 internships">2 internships</option>
+                                <option value="1 internship">1 internship</option>
+                                <option value="None planned">None planned</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Scholarship Application Effort</label>
+                              <select value={tab3.scholarshipEffort} onChange={(e) => setTab3({...tab3, scholarshipEffort: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select effort</option>
+                                <option value="Aggressive (30+ apps)">Aggressive (30+ apps)</option>
+                                <option value="Moderate (10-30 apps)">Moderate (10-30 apps)</option>
+                                <option value="Minimal (1-10 apps)">Minimal (1-10 apps)</option>
+                                <option value="No effort">No effort</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}javascript                        {activeTab === 3 && (
+                          <div className="space-y-4">
+                            <div className="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
+                              <p className="font-bold text-blue-900">Work Preferences Assessment</p>
+                              <p className="text-sm text-blue-800">Answer honestly - there are no wrong answers. Ask trusted adults for their perspective.</p>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you prefer working:</label>
+                              <select value={tab4.workWith} onChange={(e) => setTab4({...tab4, workWith: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="People">With people - teaching, helping, leading</option>
+                                <option value="Data & systems">With data & systems - analyzing, organizing, computing</option>
+                                <option value="Hands-on tasks">With hands-on tasks - building, fixing, creating</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you prefer work that is:</label>
+                              <select value={tab4.workStructure} onChange={(e) => setTab4({...tab4, workStructure: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Structured">Highly structured - clear rules and procedures</option>
+                                <option value="Flexible">Somewhat flexible - balance of structure and freedom</option>
+                                <option value="Creative">Very creative - minimal structure, lots of innovation</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you get more satisfaction from:</label>
+                              <select value={tab4.workSatisfaction} onChange={(e) => setTab4({...tab4, workSatisfaction: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Helping others">Helping others - making people's lives better</option>
+                                <option value="Solving problems">Solving problems - figuring out complex challenges</option>
+                                <option value="Creating things">Creating things - making something new</option>
+                              </select>
+                            </div>
+
+                            <div className="border-t pt-4">
+                              <p className="font-bold text-red-900 mb-2">Self-Discipline Assessment</p>
+                              
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Drug Use</label>
+                                <select value={tab4.drugUse} onChange={(e) => setTab4({...tab4, drugUse: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Never or extremely rare</option>
+                                  <option value="Some">Some - Occasional</option>
+                                  <option value="High">High - Regular use</option>
+                                </select>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Alcohol Use</label>
+                                <select value={tab4.alcoholUse} onChange={(e) => setTab4({...tab4, alcoholUse: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Never or rare</option>
+                                  <option value="Some">Some - Weekend drinking</option>
+                                  <option value="High">High - Frequent/heavy</option>
+                                </select>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Social Behavior/Focus</label>
+                                <select value={tab4.socialBehavior} onChange={(e) => setTab4({...tab4, socialBehavior: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Academics prioritized</option>
+                                  <option value="Some">Some - Balanced/distracted</option>
+                                  <option value="High">High - Social life interferes</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold mb-1">Course Selection Strategy</label>
+                                <select value={tab4.courseSelectionStrategy} onChange={(e) => setTab4({...tab4, courseSelectionStrategy: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select strategy</option>
+                                  <option value="Proactive">Proactive - Plan entire degree, register early</option>
+                                  <option value="Reactive">Reactive - Handle each semester</option>
+                                  <option value="Passive">Passive - Hope it works out</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 4 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Planned home choice for majority of working years</label>
+                              <select value={tab5.housingPlan} onChange={(e) => setTab5({...tab5, housingPlan: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Own home">Own home (typical mortgage)</option>
+                                <option value="Rent long-term">Rent long-term</option>
+                                <option value="High-cost urban">High-cost urban area</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Number of Children Planned</label>
+                              <select value={tab5.numberOfChildren} onChange={(e) => setTab5({...tab5, numberOfChildren: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select number</option>
+                                <option value="0">0</option>
+                                <option value="1">1-2</option>
+                                <option value="3">3-4</option>
+                                <option value="5">5+</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Lifestyle Spending</label>
+                              <select value={tab5.lifestyle} onChange={(e) => setTab5({...tab5, lifestyle: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select lifestyle</option>
+                                <option value="Frugal">Frugal - Minimal discretionary spending</option>
+                                <option value="Moderate">Moderate - Balanced lifestyle</option>
+                                <option value="Comfortable">Comfortable - Middle-class comforts (own home, family vacations, entertainment budget)</option>
+                                <option value="Affluent">Affluent - Premium lifestyle choices, luxury travel</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Financial Discipline</label>
+                              <select value={tab5.financialDiscipline} onChange={(e) => setTab5({...tab5, financialDiscipline: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select discipline level</option>
+                                <option value="High">High - Save first, spend what's left</option>
+                                <option value="Moderate">Moderate - Balance saving and spending</option>
+                                <option value="Low">Low - Spend most of what you earn</option>
+                                <option value="Very Low">Very Low - Excessive spending, rely on credit</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Geographic Mobility</label>
+                              <select value={tab5.mobility} onChange={(e) => setTab5({...tab5, mobility: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Very mobile">Very mobile - Relocate anywhere</option>
+                                <option value="Somewhat mobile">Somewhat mobile - Open to moving</option>
+                                <option value="Regional only">Regional only - Stay in area</option>
+                                <option value="Must stay local">Must stay local - Family ties</option>
+                              </select>
+                            </div>
+
+                            <div className="mt-4 p-4 bg-blue-50 border border-blue-300 rounded">
+                              <label className="flex items-center font-semibold">
+                                <input 
+                                  type="checkbox" 
+                                  checked={tab5.dualIncome} 
+                                  onChange={(e) => setTab5({...tab5, dualIncome: e.target.checked})} 
+                                  className="mr-3 w-5 h-5"
+                                />
+                                <span>Two-income household (planning dual-income household with both partners working)</span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-3 mt-6">
+                          {activeTab > 0 && (
+                            <button onClick={() => setActiveTab(activeTab - 1)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
+                              ← Previous
+                            </button>
+                          )}
+                          {activeTab < 4 ? (
+                            <button onClick={() => setActiveTab(activeTab + 1)} className="flex-1 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">
+                              Next →
+                            </button>
+                          ) : (
+                            <button onClick={runSimulation} className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-bold text-lg">
+                              🚀 Run Simulation
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6">
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
+                        <h2 className="text-2xl font-bold text-green-900 mb-4">📊 Your Projected Outcomes</h2>
+                        
+                        <div className="grid md:grid-cols-2 gap-4 mb-6">
+                          <div className="bg-white rounded-lg p-4 border-2 border-green-200">
+                            <p className="font-bold text-gray-700 mb-2">Projected College GPA</p>
+                            <p className="text-3xl font-bold text-green-700">{results.projectedGPA.toFixed(2)}</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
+                            <p className="font-bold text-gray-700 mb-2">Starting Salary</p>
+                            <p className="text-3xl font-bold text-blue-700">${(results.startingSalary/1000).toFixed(0)}K</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-4 border-2 border-purple-200">
+                            <p className="font-bold text-gray-700 mb-2">Lifetime NPV</p>
+                            <p className="text-3xl font-bold text-purple-700">${(results.npv/1000000).toFixed(2)}M</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-4 border-2 border-orange-200">
+                            <p className="font-bold text-gray-700 mb-2">Student Debt</p>
+                            <p className="text-3xl font-bold text-orange-700">${(results.totalDebt/1000).toFixed(0)}K</p>
+                          </div>
+
+                          <div className={`rounded-lg p-4 border-2 md:col-span-2 ${results.netWorthAt65 >= 1000000 ? 'bg-green-50 border-green-400' : results.netWorthAt65 >= 0 ? 'bg-yellow-50 border-yellow-400' : 'bg-red-50 border-red-400'}`}>
+                            <p className="font-bold text-gray-700 mb-2">Net Worth at Age 65</p>
+                            <p className={`text-3xl font-bold ${results.netWorthAt65 >= 1000000 ? 'text-green-700' : results.netWorthAt65 >= 0 ? 'text-yellow-700' : 'text-red-700'}`}>
+                              ${(results.netWorthAt65/1000).toFixed(0)}K
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">Investment balance + cumulative savings - student debt</p>
+                          </div>
+                        </div>
+
+                        {results.bankruptcyWarning && (
+                          <div className="bg-red-100 border-2 border-red-500 rounded p-4 mb-4">
+                            <p className="font-bold text-red-900 mb-2">🚨 BANKRUPTCY RISK WARNING</p>
+                            <p className="text-sm text-red-800 mb-2">Your cumulative debt has reached unsustainable levels. This lifestyle is not financially viable.</p>
+                            <p className="text-sm text-red-800 font-semibold">CONSIDER:</p>
+                            <ul className="text-sm text-red-800 list-disc ml-5 mt-1">
+                              <li>Selecting "Two-income household" if planning a working partner</li>
+                              <li>Choosing a higher-paying career field</li>
+                              <li>Improving self-discipline behaviors and/or life planning choices</li>
+                              <li>Reducing lifestyle spending expectations</li>
+                              <li>Delaying having children until debt is paid off</li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {tab5.dualIncome && (
+                          <div className="bg-orange-50 border-2 border-orange-400 rounded p-4 mb-4">
+                            <p className="font-bold text-orange-900 mb-2">⚠️ MARRIAGE & DIVORCE FINANCIAL IMPACT</p>
+                            <p className="text-sm text-orange-800 mb-2">You selected "Two-income household." Important statistics:</p>
+                            <ul className="text-sm text-orange-800 list-disc ml-5">
+                              <li>~40-45% of first marriages end in divorce</li>
+                              <li>~60% of second marriages end in divorce</li>
+                            </ul>
+                            <p className="text-sm text-orange-800 mt-2 font-semibold">Typical divorce consequences:</p>
+                            <ul className="text-sm text-orange-800 list-disc ml-5">
+                              <li>Loss of dual income (immediate 33% household income drop)</li>
+                              <li>Legal fees ($15K-$50K+)</li>
+                              <li>Asset division (~50% of accumulated wealth)</li>
+                              <li>Potential alimony/child support</li>
+                              <li>Retirement savings often reduced 40-60%</li>
+                            </ul>
+                            <p className="text-sm text-orange-800 mt-2 italic">This model assumes a stable marriage. Plan accordingly.</p>
+                          </div>
+                        )}
+
+                        <div className="mb-6">
+                          <button 
+                            onClick={() => setShowYearByYear(!showYearByYear)}
+                            className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+                          >
+                            {showYearByYear ? '📊 Hide' : '📊 View'} Year-by-Year Calculations
+                          </button>
+                        </div>
+
+                        {showYearByYear && yearByYear && (
+                          <div className="mb-6 overflow-x-auto">
+                            <h3 className="text-xl font-bold text-gray-800 mb-3">Year-by-Year Financial Projection</h3>
+                            <table className="w-full text-sm border-collapse border border-gray-300">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="border border-gray-300 px-2 py-2">Year</th>
+                                  <th className="border border-gray-300 px-2 py-2">Age</th>
+                                  <th className="border border-gray-300 px-2 py-2">Gross Salary</th>
+                                  <th className="border border-gray-300 px-2 py-2">After-Tax Income</th>
+                                  <th className="border border-gray-300 px-2 py-2">Loan Payment</th>
+                                  <th className="border border-gray-300 px-2 py-2">Base Living</th>
+                                  <th className="border border-gray-300 px-2 py-2">Housing×</th>
+                                  <th className="border border-gray-300 px-2 py-2">Child Costs</th>
+                                  <th className="border border-gray-300 px-2 py-2">Lifestyle×</th>
+                                  <th className="border border-gray-300 px-2 py-2">Cumulative Living</th>
+                                  <th className="border border-gray-300 px-2 py-2">Discretionary</th>
+                                  <th className="border border-gray-300 px-2 py-2">Invest %</th>
+                                  <th className="border border-gray-300 px-2 py-2">Invested</th>
+                                  <th className="border border-gray-300 px-2 py-2">Cumulative Cash/Debt</th>
+                                  <th className="border border-gray-300 px-2 py-2">Balance @65</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {yearByYear.map((row, idx) => (
+                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.year}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.age}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.grossSalary.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.afterTaxIncome.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.loanPayment.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.baseLiving.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.housingMult}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.childCosts.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.lifestyleMult}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.cumulativeLiving.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right ${row.discretionary < 0 ? 'bg-red-100 font-bold' : ''}`}>${row.discretionary.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.investmentRate}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.amountInvested.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right font-semibold ${row.cumulativeCash < 0 ? 'bg-red-100 text-red-700' : 'bg-green-50 text-green-700'}`}>${row.cumulativeCash.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right font-semibold">${row.investmentBalance.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <p className="text-xs text-gray-600 mt-2">
+                              <strong>Note:</strong> Investment Balance shows cumulative value at retirement (age 65) with 5% annual returns compounded.
+                              Cumulative Cash/Debt tracks savings (green, earns 1% interest) or debt (red, charges 20% interest).
+                              Negative discretionary income (red) means spending exceeds income that year.
+                            </p>
+                          </div>
+                        )}
+
+                        {results.graduationYears === 5 && (
+                          <div className="bg-red-50 border-2 border-red-400 rounded p-4 mb-4">
+                            <p className="font-bold text-red-900 mb-2">🚨 5-YEAR DEGREE ALERT</p>
+                            <p className="text-sm">Your course selection strategy resulted in a 5-year degree. Extra year cost and lost earnings significantly impact your outcome. Switching to Proactive planning could save you $100K-$150K. Taking High School AP classes can also improve your chance of graduating in 4 years.</p>
+                          </div>
+                        )}
+
+                        {tab2.advancedDegree === "Bachelor's Degree Only" && (
+                          <div className="bg-blue-50 border border-blue-300 rounded p-4 mb-4">
+                            <p className="font-bold text-blue-900 mb-2">💡 Worth Exploring: Advanced Degree Impact</p>
+                            <p className="text-sm">An advanced degree in {tab2.degreeTarget} could significantly increase lifetime earnings. Research graduate programs and talk to professionals about whether additional education makes sense for your goals.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {careerFit && (
+                        <div className={`border-2 rounded-lg p-4 mb-6 ${careerFit.colorClass}`}>
+                          <p className="font-bold mb-2">Career-Work Preference Alignment</p>
+                          <p className="text-sm">{careerFit.message}</p>
+                          <p className="text-xs mt-3 italic">Note: This is ONE factor to consider. Your interests, skills, and passion matter more than preference matching. Use this as a conversation starter, not a decision maker.</p>
+                        </div>
+                      )}
+
+                      <div className="bg-yellow-50 border border-yellow-300 rounded p-4 mb-6">
+                        <p className="font-bold text-yellow-900 mb-2">💰 Income Reality Check</p>
+                        <p className="text-sm">Some fields naturally command higher salaries than others—this is market reality, not a judgment of value. {tab2.degreeTarget} has different salary ranges than other fields. <strong>However:</strong> Your happiness, skills, and passion matter more than the numbers. Being miserable in a high-paying job is the fastest path to underperformance and career failure. Choose a field where you can thrive, not just survive.</p>
+                      </div>
+
+                      <button onClick={() => { setShowResults(false); setActiveTab(0); }} className="w-full py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-lg">
+                        ← Start Over
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<CareerPlanner />, document.getElementById('root'));
+    </script>
+</body>
+</html>
