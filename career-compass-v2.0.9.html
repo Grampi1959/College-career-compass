@@ -129,7 +129,8 @@
             }
 
             return { fitScore: totalScore * 12, message, colorClass };
-          };const runSimulation = () => {
+          };
+   const runSimulation = () => {
             if (!tab1.hsGPA || !tab1.apClasses || !tab2.degreeTarget || !tab2.advancedDegree || 
                 !tab2.collegeTier || !tab3.familyIncome || !tab4.workWith || !tab5.housingPlan) {
               alert('Please complete all tabs before running simulation');
@@ -419,7 +420,8 @@
             });
 
             setShowResults(true);
-          };if (showAbout) {
+          };
+if (showAbout) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
                 <div className="max-w-4xl bg-white rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
