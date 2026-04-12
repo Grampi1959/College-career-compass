@@ -130,7 +130,8 @@
 
             return { fitScore: totalScore * 12, message, colorClass };
           };
-   const runSimulation = () => {
+
+          const runSimulation = () => {
             if (!tab1.hsGPA || !tab1.apClasses || !tab2.degreeTarget || !tab2.advancedDegree || 
                 !tab2.collegeTier || !tab3.familyIncome || !tab4.workWith || !tab5.housingPlan) {
               alert('Please complete all tabs before running simulation');
@@ -246,7 +247,9 @@
 
             if (tab5.mobility === 'Very mobile') growthRate *= 1.1;
             else if (tab5.mobility === 'Somewhat mobile') growthRate *= 1.05;
-            else if (tab5.mobility === 'Must stay local') growthRate *= 0.9;let totalEarnings = 0;
+            else if (tab5.mobility === 'Must stay local') growthRate *= 0.9;
+
+            let totalEarnings = 0;
             let totalAfterTaxIncome = 0;
             let currentSalary = startingSalary;
             const yearlyData = [];
@@ -421,7 +424,8 @@
 
             setShowResults(true);
           };
-if (showAbout) {
+
+          if (showAbout) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
                 <div className="max-w-4xl bg-white rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
@@ -522,7 +526,9 @@ if (showAbout) {
                         <p className="text-xs text-indigo-200 mt-1">v2.0.9</p>
                       </div>
                     </div>
-                  </div>{!showResults ? (
+                  </div>
+
+                  {!showResults ? (
                     <>
                       <div className="flex border-b overflow-x-auto">
                         {['Academics', 'Degree & School', 'Finances', 'Work & Behavior', 'Life Planning'].map((tab, idx) => (
@@ -538,8 +544,7 @@ if (showAbout) {
                         ))}
                       </div>
 
-                      <div className="p-6">
-                        {activeTab === 0 && (
+                      <div className="p-6">{activeTab === 0 && (
                           <div className="space-y-4">
                             <div>
                               <label className="block font-semibold mb-1">Current High School GPA (Unweighted)</label>
@@ -874,7 +879,8 @@ if (showAbout) {
                         </div>
                       </div>
                     </>
-                  ) : <div className="p-6">
+                  ) : (
+                    <div className="p-6">
                       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
                         <h2 className="text-2xl font-bold text-green-900 mb-4">📊 Your Projected Outcomes</h2>
                         
