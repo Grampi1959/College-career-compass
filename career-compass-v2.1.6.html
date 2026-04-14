@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>College Career Compass v2.1.6</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        @media (max-width: 768px) {
+            .tab-button { font-size: 0.75rem; padding: 0.75rem 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const NetWorthChart = ({ p10, p50, p90, p10Today, p50Today, p90Today }) => {
+          const canvasRef = useRef(null);
+          const chartRef = useRef(null);
+
+          useEffect(() => {
+            if (!canvasRef.current) return;
+
+            if (chartRef.current) {
+              chartRef.current.destroy();
+              chartRef.current = null;
+            }
+
+            const p10K = Math.round(p10Today / 1000);
+            const p50K = Math.round(p50Today / 1000);
+            const p90K = Math.round(p90Today / 1000);
+
+            if (p50K <= 0) return;
+
+            function normalDistribution(x, mean, stdDev) {
+              const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2));
+              return (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+            }
+
+            const stdDev = (p90K - p10K) / (2 * 1.28);
+            const mean = p50K;
+            const maxX = Math.max(p90K * 1.5, 500);
+
+            const points = [];
+            const labels = [];
+            const step = Math.max(1, Math.round(maxX / 150));
+            for (let x = 0; x <= maxX; x += step) {
+              points.push({ x, y: normalDistribution(x, mean, stdDev) });
+              labels.push(x);
+            }
+
+            const ctx = canvasRef.current.getContext('2d');
+
+            chartRef.current = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels,
+                datasets: [{
+                  label: 'Probability Distribution',
+                  data: points,
+                  borderColor: '#5a67d8',
+                  borderWidth: 2.5,
+                  fill: false,
+                  tension: 0.4,
+                  pointRadius: 0,
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 2.2,
+                animation: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: { enabled: false }
+                },
+                scales: {
+                  x: {
+                    type: 'linear',
+                    min: 0,
+                    max: maxX,
+                    title: {
+                      display: true,
+                      text: 'Net Worth at Age 65 — Today\'s Dollars (Thousands $)',
+                      font: { size: 12, weight: 'bold' },
+                      color: '#4a5568'
+                    },
+                    ticks: {
+                      callback: function(value) {
+                        if (value === 0) return '$0';
+                        if (Math.abs(value - p10K) < step) return `$${p10K}K`;
+                        if (Math.abs(value - p50K) < step) return `$${p50K}K`;
+                        if (Math.abs(value - p90K) < step) return `$${p90K}K`;
+                        if (value % Math.round(maxX / 6 / 100) * 100 === 0) return `$${value}K`;
+                        return '';
+                      },
+                      color: '#718096',
+                      font: { size: 10 },
+                      maxRotation: 0
+                    },
+                    grid: {
+                      color: (context) => {
+                        const v = context.tick.value;
+                        if (v === 0 || Math.abs(v - p10K) < step || Math.abs(v - p50K) < step || Math.abs(v - p90K) < step)
+                          return 'rgba(0,0,0,0.2)';
+                        return 'rgba(0,0,0,0.05)';
+                      },
+                      lineWidth: (context) => {
+                        const v = context.tick.value;
+                        if (v === 0 || Math.abs(v - p10K) < step || Math.abs(v - p50K) < step || Math.abs(v - p90K) < step)
+                          return 2;
+                        return 1;
+                      }
+                    }
+                  },
+                  y: {
+                    title: { display: false },
+                    ticks: { display: false },
+                    grid: { display: false }
+                  }
+                }
+              },
+              plugins: [{
+                id: 'coloredZones',
+                beforeDatasetsDraw: (chart) => {
+                  const { ctx, chartArea: { bottom }, scales: { x, y } } = chart;
+                  const dataset = chart.data.datasets[0];
+
+                  const drawZone = (startX, endX, color) => {
+                    ctx.save();
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    let started = false;
+                    dataset.data.forEach((point) => {
+                      if (point.x >= startX && point.x <= endX) {
+                        const xPixel = x.getPixelForValue(point.x);
+                        const yPixel = y.getPixelForValue(point.y);
+                        if (!started) {
+                          ctx.moveTo(xPixel, bottom);
+                          ctx.lineTo(xPixel, yPixel);
+                          started = true;
+                        } else {
+                          ctx.lineTo(xPixel, yPixel);
+                        }
+                      }
+                    });
+                    if (started) {
+                      const endPixel = x.getPixelForValue(Math.min(endX, dataset.data[dataset.data.length - 1].x));
+                      ctx.lineTo(endPixel, bottom);
+                      ctx.closePath();
+                      ctx.fill();
+                    }
+                    ctx.restore();
+                  };
+
+                  drawZone(0, p10K, 'rgba(229,62,62,0.35)');
+                  drawZone(p10K, p90K, 'rgba(56,161,105,0.35)');
+                  drawZone(p90K, maxX, 'rgba(214,158,46,0.35)');
+                }
+              }]
+            });
+
+            return () => {
+              if (chartRef.current) {
+                chartRef.current.destroy();
+                chartRef.current = null;
+              }
+            };
+          }, [p10, p50, p90]);
+
+          const p10K = Math.round(p10Today / 1000);
+          const p50K = Math.round(p50Today / 1000);
+          const p90K = Math.round(p90Today / 1000);
+
+          return (
+            <div className="bg-white border-2 border-purple-200 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-1 text-center">Net Worth at Age 65 — Probability Distribution</h3>
+              <p className="text-xs text-gray-500 text-center mb-3">Shown in today's dollars (3% inflation, 48 years). The red zone left of $0 represents negative net worth — meaning debt exceeds assets at retirement.</p>
+              <canvas ref={canvasRef}></canvas>
+              <div className="flex justify-center gap-6 mt-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{background:'rgba(229,62,62,0.7)'}}></div>
+                  <span className="text-xs text-gray-600"><strong>P10 (${p10K}K)</strong> — Bottom 10%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{background:'rgba(56,161,105,0.7)'}}></div>
+                  <span className="text-xs text-gray-600"><strong>P50 (${p50K}K)</strong> — Most Likely</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{background:'rgba(214,158,46,0.7)'}}></div>
+                  <span className="text-xs text-gray-600"><strong>P90 (${p90K}K)</strong> — Top 10%</span>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const CareerPlanner = () => {
+          const [activeTab, setActiveTab] = useState(0);
+          const [showResults, setShowResults] = useState(false);
+          const [showDisclaimer, setShowDisclaimer] = useState(false);
+          const [showAbout, setShowAbout] = useState(true);
+          
+          const [tab1, setTab1] = useState({ hsGPA: '', apClasses: '' });
+          const [tab2, setTab2] = useState({ degreeTarget: '', advancedDegree: '', collegeTier: '' });
+          const [tab3, setTab3] = useState({ 
+            familyIncome: '',
+            fundingFamily: false,
+            fundingLoans: false,
+            fundingGrants: false,
+            fundingWorkStudy: false,
+            fundingScholarships: false,
+            workStudy: '',
+            internships: '',
+            scholarshipEffort: ''
+          });
+          const [tab4, setTab4] = useState({
+            workWith: '',
+            workStructure: '',
+            workSatisfaction: '',
+            drugUse: '',
+            alcoholUse: '',
+            socialBehavior: '',
+            courseSelectionStrategy: ''
+          });
+          const [tab5, setTab5] = useState({
+            housingPlan: '',
+            numberOfChildren: '',
+            mobility: '',
+            dualIncome: false
+          });
+          
+          const [results, setResults] = useState(null);
+          const [careerFit, setCareerFit] = useState(null);
+          const [yearByYear, setYearByYear] = useState(null);
+          const [showYearByYear, setShowYearByYear] = useState(false);
+
+          const analyzeCareerFit = (workWith, workStructure, workSatisfaction, degree) => {
+            const fits = {
+              'Computer Science': {
+                workWith: { 'Data & systems': 2, 'People': 0, 'Hands-on tasks': 1 },
+                workStructure: { 'Structured': 1, 'Flexible': 2, 'Creative': 2 },
+                workSatisfaction: { 'Helping others': 0, 'Solving problems': 2, 'Creating things': 2 },
+                reason: 'requires analytical thinking and problem-solving with data and systems'
+              },
+              'Engineering/Science': {
+                workWith: { 'Data & systems': 2, 'People': 0, 'Hands-on tasks': 2 },
+                workStructure: { 'Structured': 2, 'Flexible': 1, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 2, 'Creating things': 1 },
+                reason: 'involves systematic problem-solving and hands-on technical work'
+              },
+              'Business': {
+                workWith: { 'Data & systems': 1, 'People': 2, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 1, 'Flexible': 2, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 1, 'Creating things': 1 },
+                reason: 'focuses on working with people and flexible problem-solving'
+              },
+              'Medical/Healthcare': {
+                workWith: { 'Data & systems': 1, 'People': 2, 'Hands-on tasks': 1 },
+                workStructure: { 'Structured': 2, 'Flexible': 0, 'Creative': 0 },
+                workSatisfaction: { 'Helping others': 2, 'Solving problems': 1, 'Creating things': 0 },
+                reason: 'centers on helping people with structured protocols'
+              },
+              'Teaching': {
+                workWith: { 'Data & systems': 0, 'People': 2, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 2, 'Flexible': 1, 'Creative': 1 },
+                workSatisfaction: { 'Helping others': 2, 'Solving problems': 0, 'Creating things': 1 },
+                reason: 'is about helping people within structured educational frameworks'
+              },
+              'Liberal Arts': {
+                workWith: { 'Data & systems': 1, 'People': 1, 'Hands-on tasks': 0 },
+                workStructure: { 'Structured': 0, 'Flexible': 1, 'Creative': 2 },
+                workSatisfaction: { 'Helping others': 1, 'Solving problems': 1, 'Creating things': 2 },
+                reason: 'emphasizes creative thinking and diverse perspectives'
+              }
+            };
+
+            const degreeData = fits[degree] || fits['Business'];
+            const score1 = degreeData.workWith[workWith] || 0;
+            const score2 = degreeData.workStructure[workStructure] || 0;
+            const score3 = degreeData.workSatisfaction[workSatisfaction] || 0;
+            const totalScore = score1 + score2 + score3;
+
+            let message = '';
+            let colorClass = '';
+            
+            if (totalScore >= 5) {
+              message = `🎯 Strong alignment: Your work preferences tend to align well with ${degree}, which ${degreeData.reason}. Many people with similar preferences find success in this field.`;
+              colorClass = 'bg-green-50 border-green-400';
+            } else if (totalScore >= 3) {
+              message = `👍 Good alignment: Your preferences generally fit ${degree}, which ${degreeData.reason}. Talk to people in the field to learn more about day-to-day realities.`;
+              colorClass = 'bg-blue-50 border-blue-300';
+            } else if (totalScore >= 1) {
+              message = `⚠️ Worth exploring carefully: ${degree} ${degreeData.reason}, which differs somewhat from your stated preferences. Consider internships or informational interviews before committing.`;
+              colorClass = 'bg-yellow-50 border-yellow-400';
+            } else {
+              message = `💭 Consider carefully: Your preferences may not typically align with ${degree}, which ${degreeData.reason}. This doesn't mean you can't succeed, but research the field thoroughly and talk to professionals.`;
+              colorClass = 'bg-orange-50 border-orange-400';
+            }
+
+            return { fitScore: totalScore * 12, message, colorClass };
+          };
+
+          const runSimulation = () => {
+            if (!tab1.hsGPA || !tab1.apClasses || !tab2.degreeTarget || !tab2.advancedDegree || 
+                !tab2.collegeTier || !tab3.familyIncome || !tab4.workWith || !tab5.housingPlan) {
+              alert('Please complete all tabs before running simulation');
+              return;
+            }
+
+            const fit = analyzeCareerFit(tab4.workWith, tab4.workStructure, tab4.workSatisfaction, tab2.degreeTarget);
+            setCareerFit(fit);
+
+            let projectedGPA = parseFloat(tab1.hsGPA);
+            if (tab4.drugUse === 'Some') projectedGPA -= 0.5;
+            else if (tab4.drugUse === 'High') projectedGPA -= 1.2;
+            if (tab4.alcoholUse === 'Some') projectedGPA -= 0.25;
+            else if (tab4.alcoholUse === 'High') projectedGPA -= 0.6;
+            if (tab4.socialBehavior === 'Some') projectedGPA -= 0.25;
+            else if (tab4.socialBehavior === 'High') projectedGPA -= 0.5;
+            if (tab4.courseSelectionStrategy === 'Proactive') projectedGPA += 0.1;
+            else if (tab4.courseSelectionStrategy === 'Reactive') projectedGPA -= 0.15;
+            else projectedGPA -= 0.4;
+            projectedGPA = Math.max(0, Math.min(4.0, projectedGPA));
+
+            const tierCosts = {
+              'Ivy League / Top 20 ($60K+)': 60000,
+              'Elite Out-of-State ($35K)': 35000,
+              'State Flagship ($25K)': 25000,
+              'Regional State ($18K)': 18000,
+              'Community College ($4K)': 4000
+            };
+            let annualCost = tierCosts[tab2.collegeTier] || 25000;
+
+            const income = parseInt(tab3.familyIncome.replace(/[^0-9]/g, '')) || 100000;
+            let grantPct = 0;
+            if (income < 30000) grantPct = 0.7;
+            else if (income < 60000) grantPct = 0.5;
+            else if (income < 100000) grantPct = 0.3;
+            else if (income < 150000) grantPct = 0.15;
+            
+            const grantAid = annualCost * grantPct;
+
+            let workStudyAmt = 0;
+            if (tab3.workStudy === 'Yes') workStudyAmt = 6000;
+
+            let scholarshipAmt = 0;
+            if (tab3.scholarshipEffort === 'Aggressive (30+ apps)') scholarshipAmt = 12000;
+            else if (tab3.scholarshipEffort === 'Moderate (10-30 apps)') scholarshipAmt = 6000;
+            else if (tab3.scholarshipEffort === 'Minimal (1-10 apps)') scholarshipAmt = 2000;
+
+            let internshipAmt = 0;
+            if (tab3.internships === '3+ internships') internshipAmt = 15000;
+            else if (tab3.internships === '2 internships') internshipAmt = 10000;
+            else if (tab3.internships === '1 internship') internshipAmt = 5000;
+
+            const apClasses = parseInt(tab1.apClasses) || 0;
+            let fourYearProb = 0.5;
+            if (tab4.courseSelectionStrategy === 'Proactive' && apClasses >= 3) fourYearProb = 0.9;
+            else if (tab4.courseSelectionStrategy === 'Proactive') fourYearProb = 0.8;
+            else if (tab4.courseSelectionStrategy === 'Reactive' && apClasses >= 3) fourYearProb = 0.6;
+            else if (tab4.courseSelectionStrategy === 'Reactive') fourYearProb = 0.45;
+            else fourYearProb = 0.3;
+
+            // 5-year penalty: triggered if course selection is not Proactive OR any behavior is not None
+            const behaviorPenalty = tab4.drugUse !== 'None' || tab4.alcoholUse !== 'None' || tab4.socialBehavior !== 'None';
+            const notProactive = tab4.courseSelectionStrategy !== 'Proactive';
+            if (behaviorPenalty || notProactive) {
+              if (tab4.drugUse === 'High') fourYearProb *= 0.6;
+              else if (tab4.drugUse === 'Some') fourYearProb *= 0.85;
+              if (tab4.alcoholUse === 'High') fourYearProb *= 0.7;
+              else if (tab4.alcoholUse === 'Some') fourYearProb *= 0.9;
+              if (tab4.socialBehavior === 'High') fourYearProb *= 0.75;
+              else if (tab4.socialBehavior === 'Some') fourYearProb *= 0.9;
+              if (notProactive && !behaviorPenalty) fourYearProb *= 0.85;
+            }
+            fourYearProb = Math.max(0.1, Math.min(0.95, fourYearProb));
+
+            const graduationYears = Math.random() < fourYearProb ? 4 : 5;
+
+            let yearlyDebt = annualCost - grantAid - workStudyAmt - (scholarshipAmt / 4);
+            let totalDebt = Math.max(0, yearlyDebt * graduationYears - internshipAmt);
+
+            if (tab2.advancedDegree === 'MBA') totalDebt += 120000;
+            else if (tab2.advancedDegree === 'Masters') totalDebt += 80000;
+            else if (tab2.advancedDegree === 'PhD') totalDebt += 100000;
+
+            if (tab3.fundingFamily && !tab3.fundingLoans && !tab3.fundingGrants && 
+                !tab3.fundingWorkStudy && !tab3.fundingScholarships) {
+              totalDebt = 0;
+            }
+
+            const salaryBase = {
+              'Computer Science': 85000,
+              'Engineering/Science': 75000,
+              'Business': 60000,
+              'Medical/Healthcare': 65000,
+              'Teaching': 42000,
+              'Liberal Arts': 45000
+            };
+            let baseSalary = salaryBase[tab2.degreeTarget] || 60000;
+
+            const gpaOffset = (projectedGPA - 3.2) / 0.1;
+            baseSalary *= Math.pow(1.025, gpaOffset);
+
+            if (tab2.advancedDegree === 'MBA') baseSalary *= 1.4;
+            else if (tab2.advancedDegree === 'Masters') baseSalary *= 1.25;
+            else if (tab2.advancedDegree === 'PhD') baseSalary *= 1.35;
+
+            const startingSalary = baseSalary;
+
+            const growthBase = {
+              'Computer Science': 0.08,
+              'Engineering/Science': 0.06,
+              'Business': 0.05,
+              'Medical/Healthcare': 0.06,
+              'Teaching': 0.03,
+              'Liberal Arts': 0.04
+            };
+            let growthRate = growthBase[tab2.degreeTarget] || 0.05;
+
+            if (projectedGPA >= 3.6) growthRate *= 1.1;
+            else if (projectedGPA >= 3.2) growthRate *= 1.05;
+            else if (projectedGPA >= 3.0) growthRate *= 1.0;
+            else if (projectedGPA >= 2.6) growthRate *= 0.9;
+            else growthRate *= 0.8;
+
+            if (tab5.mobility === 'Very mobile') growthRate *= 1.1;
+            else if (tab5.mobility === 'Somewhat mobile') growthRate *= 1.05;
+            else if (tab5.mobility === 'Must stay local') growthRate *= 0.9;
+
+            // Base starting ages by degree, +1 if 5-year penalty applies
+            const extraYear = graduationYears === 5 ? 1 : 0;
+            let startingAge = 22 + extraYear;
+            if (tab2.advancedDegree === 'Masters') startingAge = 24 + extraYear;
+            else if (tab2.advancedDegree === 'MBA') startingAge = 26 + extraYear;
+            else if (tab2.advancedDegree === 'PhD') startingAge = 27 + extraYear;
+
+            const workingYears = 65 - startingAge + 1;
+
+            let totalEarnings = 0;
+            let totalAfterTaxIncome = 0;
+            let currentSalary = startingSalary;
+            const yearlyData = [];
+            let investmentBalance = 0;
+            let cumulativeCash = 0;
+            let bankruptcyWarning = false;
+            let showVocationalWarning = false;
+            
+            let numChildren = 0;
+            if (tab5.numberOfChildren === '1') numChildren = 2;
+            else if (tab5.numberOfChildren === '3') numChildren = 3;
+            else if (tab5.numberOfChildren === '5') numChildren = 5;
+            
+            const annualLoanPayment = totalDebt / 10;
+            
+            for (let year = 0; year < workingYears; year++) {
+              const age = startingAge + year;
+              const grossSalary = currentSalary;
+              totalEarnings += grossSalary;
+
+              // Sliding effective tax rate by income bracket
+              let effectiveTaxRate;
+              if (grossSalary < 44000) effectiveTaxRate = 0.12;
+              else if (grossSalary < 89000) effectiveTaxRate = 0.18;
+              else if (grossSalary < 178000) effectiveTaxRate = 0.22;
+              else effectiveTaxRate = 0.26;
+              let afterTaxIncome = grossSalary * (1 - effectiveTaxRate);
+              
+              let mortgageTaxSavings = 0;
+              let housingMult = 1.0;
+              
+              if (year < 5) {
+                housingMult = 1.15;
+              } else {
+                if (tab5.housingPlan === 'Own home') {
+                  housingMult = 1.0;
+                  mortgageTaxSavings = grossSalary * 0.0175;
+                  afterTaxIncome += mortgageTaxSavings;
+                } else if (tab5.housingPlan === 'Rent long-term') {
+                  housingMult = 1.15;
+                } else if (tab5.housingPlan === 'High-cost urban') {
+                  housingMult = 1.40;
+                }
+              }
+              
+              let childTaxCredit = 0;
+              if (year >= 5 && year <= 22 && numChildren > 0) {
+                childTaxCredit = 2000 * numChildren;
+                afterTaxIncome += childTaxCredit;
+              }
+              
+              let partnerIncome = 0;
+              if (tab5.dualIncome && year >= 5) {
+                partnerIncome = afterTaxIncome * 0.50;
+                afterTaxIncome += partnerIncome;
+              }
+              
+              const loanPayment = (year < 10) ? annualLoanPayment : 0;
+              
+              let baseLiving = 0;
+              if (afterTaxIncome < 40000) {
+                baseLiving = afterTaxIncome * 0.95;
+              } else if (afterTaxIncome < 60000) {
+                baseLiving = 35000 + (afterTaxIncome - 40000) * 0.85;
+              } else if (afterTaxIncome < 100000) {
+                baseLiving = 52000 + (afterTaxIncome - 60000) * 0.70;
+              } else {
+                baseLiving = 80000 + (afterTaxIncome - 100000) * 0.50;
+              }
+              
+              const childCosts = (year >= 5 && year <= 22 && numChildren > 0) ? 25000 * numChildren : 0;
+              
+              let totalLivingExpenses = (baseLiving * housingMult) + childCosts;
+              
+              const afterLoanIncome = afterTaxIncome - loanPayment;
+              
+              let discretionary = 0;
+              let cashSavings = 0;
+              let amountInvested = 0;
+              let additionalSpending = 0;
+              
+              if (afterLoanIncome <= totalLivingExpenses) {
+                totalLivingExpenses = afterLoanIncome;
+                discretionary = 0;
+                cashSavings = 0;
+                amountInvested = 0;
+                additionalSpending = 0;
+              } else {
+                discretionary = afterLoanIncome - totalLivingExpenses;
+                cashSavings = discretionary * 0.50;
+                amountInvested = discretionary * 0.05;
+                additionalSpending = discretionary * 0.45;
+              }
+              
+              const yearsToRetirement = workingYears - year;
+              const futureValue = amountInvested * Math.pow(1.05, yearsToRetirement);
+              investmentBalance += futureValue;
+              
+              if (cumulativeCash < 0) {
+                cumulativeCash = cumulativeCash * 1.20;
+              } else if (cumulativeCash > 0) {
+                cumulativeCash = cumulativeCash * 1.01;
+              }
+              
+              cumulativeCash += cashSavings;
+              
+              if (cumulativeCash < -250000 || (afterTaxIncome > 0 && cumulativeCash < -(afterTaxIncome * 2))) {
+                bankruptcyWarning = true;
+              }
+              
+              yearlyData.push({
+                year: year + 1,
+                age,
+                grossSalary: Math.round(grossSalary),
+                afterTaxIncome: Math.round(afterTaxIncome),
+                loanPayment: Math.round(loanPayment),
+                baseLiving: Math.round(baseLiving),
+                housingMult: housingMult.toFixed(2),
+                childCosts: Math.round(childCosts),
+                totalLivingExpenses: Math.round(totalLivingExpenses),
+                discretionary: Math.round(discretionary),
+                cashSavings: Math.round(cashSavings),
+                amountInvested: Math.round(amountInvested),
+                additionalSpending: Math.round(additionalSpending),
+                cumulativeCash: Math.round(cumulativeCash),
+                cumulativeCashToday: Math.round(cumulativeCash / Math.pow(1.03, 48 - (workingYears - year - 1))),
+                investmentBalance: Math.round(investmentBalance),
+                totalNetWorth: Math.round(investmentBalance + cumulativeCash - totalDebt)
+              });
+              
+              totalAfterTaxIncome += afterTaxIncome;
+              currentSalary *= (1 + growthRate);
+            }
+
+            const npv = totalAfterTaxIncome - (totalDebt * 1.5);
+            const netWorthAt65 = investmentBalance + cumulativeCash - totalDebt;
+
+            const inflationFactor = Math.pow(1.03, 48);
+            const netWorthAt65Today = netWorthAt65 / inflationFactor;
+
+            // Consolidated vocational/military trigger
+            const debtToSalaryHigh = totalDebt > startingSalary * 1.5;
+            const gpaLow = projectedGPA < 2.8;
+            const handsOn = tab4.workWith === 'Hands-on tasks';
+            const netWorthLow = netWorthAt65Today < 300000;
+            showVocationalWarning = netWorthLow || debtToSalaryHigh || gpaLow || handsOn;
+
+            // Military trigger: same as vocational PLUS low income / high debt
+            const lowIncomeHighDebt = (income < 60000) && (totalDebt > 80000);
+            const showMilitaryWarning = showVocationalWarning || lowIncomeHighDebt;
+            
+            const npvP10 = npv * 0.33;
+            const npvP50 = npv;
+            const npvP90 = npv * 2.0;
+            
+            const netWorthP10 = netWorthAt65 * 0.33;
+            const netWorthP50 = netWorthAt65;
+            const netWorthP90 = netWorthAt65 * 2.0;
+
+            const netWorthP10Today = netWorthP10 / inflationFactor;
+            const netWorthP50Today = netWorthP50 / inflationFactor;
+            const netWorthP90Today = netWorthP90 / inflationFactor;
+            
+            setYearByYear(yearlyData);
+
+            setResults({
+              projectedGPA,
+              startingSalary,
+              totalDebt,
+              graduationYears,
+              npv,
+              netWorthAt65,
+              lifetimeEarnings: totalEarnings,
+              fourYearProb,
+              bankruptcyWarning,
+              finalCumulativeCash: cumulativeCash,
+              showVocationalWarning,
+              showMilitaryWarning,
+              npvP10,
+              npvP50,
+              npvP90,
+              netWorthP10,
+              netWorthP50,
+              netWorthP90,
+              netWorthP10Today,
+              netWorthP50Today,
+              netWorthP90Today,
+              startingAge,
+              workingYears
+            });
+
+            setShowResults(true);
+          };
+
+          if (showAbout) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
+                <div className="max-w-4xl bg-white rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-4">About This Tool</h1>
+                  <p className="text-sm text-gray-600 mb-6">Version 2.1.6 - April 2026</p>
+                  
+                  <div className="space-y-4 text-gray-700">
+                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+                      <p className="font-bold text-blue-900 mb-2">📚 Model Background</p>
+                      <p className="text-sm">Built on 20 years of experience hiring and mentoring college graduates. Projections reflect real hiring practices and career progression.</p>
+                    </div>
+
+                    <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                      <p className="font-bold text-red-900 mb-2">🚨 Important Disclaimer</p>
+                      <p className="text-sm mb-2"><strong>USE AT YOUR OWN RISK.</strong> This tool provides projections only. Your actual outcomes depend on effort, aptitude, and circumstances beyond the model's scope.</p>
+                      <p className="text-sm">Not a substitute for guidance from counselors, parents, or other trusted adults.</p>
+                    </div>
+
+                    <div className="bg-purple-50 border-l-4 border-purple-400 p-4">
+                      <p className="font-bold text-purple-900 mb-2">💪 Take Charge of Your Future</p>
+                      <p className="text-sm mb-2">High school is the critical time when YOU must take charge of your own career path. The decisions you make now will directly impact your life path and determine how much joy or pain you experience as an adult.</p>
+                      <p className="text-sm">This is not someone else's responsibility - it's yours. Plan wisely.</p>
+                    </div>
+
+                    <div className="bg-gray-50 border-l-4 border-gray-400 p-4">
+                      <p className="font-bold text-gray-900 mb-2">📖 Copyright & Usage</p>
+                      <p className="text-sm">© Sam Mishael. This version is free to use. The underlying model, financial logic, and educational content are copyrighted. Developers who build on or enhance this tool are encouraged to keep it free and share improvements.</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => setShowAbout(false)} className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold">
+                    Continue to Tool
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-8 px-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h1 className="text-3xl font-bold mb-2">College Career Compass</h1>
+                        <p className="text-indigo-100">Evidence-based planning tool</p>
+                      </div>
+                      <div className="text-right">
+                        <button onClick={() => setShowAbout(true)} className="px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-sm font-semibold">
+                          ABOUT
+                        </button>
+                        <p className="text-xs text-indigo-200 mt-1">v2.1.6</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!showResults ? (
+                    <>
+                      <div className="flex border-b overflow-x-auto">
+                        {['Academics', 'Degree & School', 'Finances', 'Work & Behavior', 'Life Planning'].map((tab, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveTab(idx)}
+                            className={`tab-button flex-1 py-4 px-2 text-sm font-semibold transition-all whitespace-nowrap ${
+                              activeTab === idx ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {idx + 1}. {tab}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="p-6">{activeTab === 0 && (
+                          <div className="space-y-4">
+                            <div className="bg-blue-50 border border-blue-300 rounded p-3">
+                              <p className="font-bold text-blue-900 mb-2">📚 About Your GPA Projection</p>
+                              <p className="text-sm text-blue-800 mb-2">This model uses your current high school GPA as the starting point for your projected college GPA. In reality, college is harder than high school and requires more self-discipline — so your college GPA may be similar to or somewhat lower than your high school GPA without strong focus.</p>
+                              <p className="text-sm text-blue-800 mb-2"><strong>The good news:</strong> Students who arrive with a clear plan, attend class consistently, seek help early, and avoid distractions can maintain or even improve their GPA. The behaviors you report on the Work & Behavior tab adjust your projected college GPA accordingly.</p>
+                              <p className="text-sm text-blue-800"><strong>Why it matters:</strong> Every 0.1 increase in college GPA improves your projected starting salary and career growth rate. A 3.8 graduate has a major advantage in getting a better job with a higher salary than a 3.0 graduate in the same field.</p>
+                            </div>
+                            <div>
+                              <label className="block font-semibold mb-1">Current High School GPA (Unweighted)</label>
+                              <select value={tab1.hsGPA} onChange={(e) => setTab1({...tab1, hsGPA: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select GPA</option>
+                                <option value="4.0">4.0</option>
+                                <option value="3.8">3.8-3.99</option>
+                                <option value="3.5">3.5-3.79</option>
+                                <option value="3.3">3.3-3.49</option>
+                                <option value="3.0">3.0-3.29</option>
+                                <option value="2.7">2.7-2.99</option>
+                                <option value="2.5">2.5-2.69</option>
+                                <option value="2.0">2.0-2.29</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">AP/Honors Classes Taken</label>
+                              <select value={tab1.apClasses} onChange={(e) => setTab1({...tab1, apClasses: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select number</option>
+                                <option value="0">0 (None)</option>
+                                <option value="1">1-2</option>
+                                <option value="3">3-4</option>
+                                <option value="5">5-7</option>
+                                <option value="8">8+</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 1 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Target Degree Field</label>
+                              <select value={tab2.degreeTarget} onChange={(e) => setTab2({...tab2, degreeTarget: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select field</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Engineering/Science">Engineering/Science</option>
+                                <option value="Business">Business</option>
+                                <option value="Medical/Healthcare">Medical/Healthcare</option>
+                                <option value="Teaching">Teaching</option>
+                                <option value="Liberal Arts">Liberal Arts</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Advanced Degree Plans</label>
+                              <select value={tab2.advancedDegree} onChange={(e) => setTab2({...tab2, advancedDegree: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Bachelor's Degree Only">Bachelor's Degree Only</option>
+                                <option value="MBA">MBA</option>
+                                <option value="Masters">Master's Degree</option>
+                                <option value="PhD">PhD</option>
+                                <option value="Pre-Med">Pre-Med (Bachelor's Only)</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">College Tier Preference</label>
+                              <select value={tab2.collegeTier} onChange={(e) => setTab2({...tab2, collegeTier: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select tier</option>
+                                <option value="Ivy League / Top 20 ($60K+)">Ivy League / Top 20 ($60K+)</option>
+                                <option value="Elite Out-of-State ($35K)">Elite Out-of-State ($35K)</option>
+                                <option value="State Flagship ($25K)">State Flagship ($25K)</option>
+                                <option value="Regional State ($18K)">Regional State ($18K)</option>
+                                <option value="Community College ($4K)">Community College ($4K)</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 2 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Family Current Annual Income</label>
+                              <select value={tab3.familyIncome} onChange={(e) => setTab3({...tab3, familyIncome: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select range</option>
+                                <option value="0-30000">Under $30K</option>
+                                <option value="30000-60000">$30K-$60K</option>
+                                <option value="60000-100000">$60K-$100K</option>
+                                <option value="100000-150000">$100K-$150K</option>
+                                <option value="150000+">$150K+</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-2">How will you pay for college? (Check all that apply)</label>
+                              <div className="space-y-2">
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingFamily} onChange={(e) => setTab3({...tab3, fundingFamily: e.target.checked})} className="mr-2" />
+                                  <span>Family contributions</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingGrants} onChange={(e) => setTab3({...tab3, fundingGrants: e.target.checked})} className="mr-2" />
+                                  <span>Federal/State grants (need-based aid)</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingScholarships} onChange={(e) => setTab3({...tab3, fundingScholarships: e.target.checked})} className="mr-2" />
+                                  <span>Scholarships (merit-based)</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingWorkStudy} onChange={(e) => setTab3({...tab3, fundingWorkStudy: e.target.checked})} className="mr-2" />
+                                  <span>Work-study earnings</span>
+                                </label>
+                                <label className="flex items-center">
+                                  <input type="checkbox" checked={tab3.fundingLoans} onChange={(e) => setTab3({...tab3, fundingLoans: e.target.checked})} className="mr-2" />
+                                  <span>Student loans</span>
+                                </label>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Work-Study During School</label>
+                              <select value={tab3.workStudy} onChange={(e) => setTab3({...tab3, workStudy: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Yes">Yes - 15 hrs/week ($6K/year)</option>
+                                <option value="No">No work during school</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Planned Paid Internships</label>
+                              <select value={tab3.internships} onChange={(e) => setTab3({...tab3, internships: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="3+ internships">3+ internships</option>
+                                <option value="2 internships">2 internships</option>
+                                <option value="1 internship">1 internship</option>
+                                <option value="None planned">None planned</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Scholarship Application Effort</label>
+                              <select value={tab3.scholarshipEffort} onChange={(e) => setTab3({...tab3, scholarshipEffort: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select effort</option>
+                                <option value="Aggressive (30+ apps)">Aggressive (30+ apps)</option>
+                                <option value="Moderate (10-30 apps)">Moderate (10-30 apps)</option>
+                                <option value="Minimal (1-10 apps)">Minimal (1-10 apps)</option>
+                                <option value="No effort">No effort</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 3 && (
+                          <div className="space-y-4">
+                            <div className="bg-blue-50 border border-blue-300 rounded p-3 mb-4">
+                              <p className="font-bold text-blue-900">Work Preferences Assessment</p>
+                              <p className="text-sm text-blue-800">Answer honestly - there are no wrong answers. Ask trusted adults for their perspective.</p>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you prefer working:</label>
+                              <select value={tab4.workWith} onChange={(e) => setTab4({...tab4, workWith: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="People">With people - teaching, helping, leading</option>
+                                <option value="Data & systems">With data & systems - analyzing, organizing, computing</option>
+                                <option value="Hands-on tasks">With hands-on tasks - building, fixing, creating</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you prefer work that is:</label>
+                              <select value={tab4.workStructure} onChange={(e) => setTab4({...tab4, workStructure: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Structured">Highly structured - clear rules and procedures</option>
+                                <option value="Flexible">Somewhat flexible - balance of structure and freedom</option>
+                                <option value="Creative">Very creative - minimal structure, lots of innovation</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Do you get more satisfaction from:</label>
+                              <select value={tab4.workSatisfaction} onChange={(e) => setTab4({...tab4, workSatisfaction: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Helping others">Helping others - making people's lives better</option>
+                                <option value="Solving problems">Solving problems - figuring out complex challenges</option>
+                                <option value="Creating things">Creating things - making something new</option>
+                              </select>
+                            </div>
+
+                            <div className="border-t pt-4">
+                              <p className="font-bold text-red-900 mb-2">Self-Discipline Assessment</p>
+                              
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Drug Use</label>
+                                <select value={tab4.drugUse} onChange={(e) => setTab4({...tab4, drugUse: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Never or extremely rare</option>
+                                  <option value="Some">Some - Occasional</option>
+                                  <option value="High">High - Regular use</option>
+                                </select>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Alcohol Use</label>
+                                <select value={tab4.alcoholUse} onChange={(e) => setTab4({...tab4, alcoholUse: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Never or rare</option>
+                                  <option value="Some">Some - Weekend drinking</option>
+                                  <option value="High">High - Frequent/heavy</option>
+                                </select>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="block font-semibold mb-1">Social Behavior/Focus</label>
+                                <select value={tab4.socialBehavior} onChange={(e) => setTab4({...tab4, socialBehavior: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select level</option>
+                                  <option value="None">None - Academics prioritized</option>
+                                  <option value="Some">Some - Balanced/distracted</option>
+                                  <option value="High">High - Social life interferes</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold mb-1">Course Selection Strategy</label>
+                                <select value={tab4.courseSelectionStrategy} onChange={(e) => setTab4({...tab4, courseSelectionStrategy: e.target.value})} className="w-full p-2 border rounded">
+                                  <option value="">Select strategy</option>
+                                  <option value="Proactive">Proactive - Plan entire degree, register early</option>
+                                  <option value="Reactive">Reactive - Handle each semester</option>
+                                  <option value="Passive">Passive - Hope it works out</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === 4 && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block font-semibold mb-1">Planned home choice for majority of working years</label>
+                              <select value={tab5.housingPlan} onChange={(e) => setTab5({...tab5, housingPlan: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select plan</option>
+                                <option value="Own home">Own home (typical mortgage)</option>
+                                <option value="Rent long-term">Rent long-term</option>
+                                <option value="High-cost urban">High-cost urban area</option>
+                              </select>
+                              <p className="text-xs text-gray-600 mt-2">
+                                💡 Note: Home ownership is generally less expensive than renting due to mortgage interest tax deduction (reduces taxes), building equity instead of paying landlord, and fixed payments vs rising rents. Model assumes renting until age 27, then buying if "Own home" selected.
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Number of Children Planned</label>
+                              <select value={tab5.numberOfChildren} onChange={(e) => setTab5({...tab5, numberOfChildren: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select number</option>
+                                <option value="0">0</option>
+                                <option value="1">1-2</option>
+                                <option value="3">3-4</option>
+                                <option value="5">5+</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block font-semibold mb-1">Geographic Mobility</label>
+                              <select value={tab5.mobility} onChange={(e) => setTab5({...tab5, mobility: e.target.value})} className="w-full p-2 border rounded">
+                                <option value="">Select preference</option>
+                                <option value="Very mobile">Very mobile - Relocate anywhere</option>
+                                <option value="Somewhat mobile">Somewhat mobile - Open to moving</option>
+                                <option value="Regional only">Regional only - Stay in area</option>
+                                <option value="Must stay local">Must stay local - Family ties</option>
+                              </select>
+                            </div>
+
+                            <div className="mt-4 p-4 bg-blue-50 border border-blue-300 rounded">
+                              <label className="flex items-center font-semibold">
+                                <input 
+                                  type="checkbox" 
+                                  checked={tab5.dualIncome} 
+                                  onChange={(e) => setTab5({...tab5, dualIncome: e.target.checked})} 
+                                  className="mr-3 w-5 h-5"
+                                />
+                                <span>Two-income household (planning dual-income household with both partners working)</span>
+                              </label>
+                            </div>
+
+                            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-400 rounded">
+                              <p className="font-bold text-yellow-900 mb-2">📊 Spending & Savings Model</p>
+                              <p className="text-sm text-yellow-800 mb-2">This model assumes realistic financial behavior:</p>
+                              <ul className="text-sm text-yellow-800 list-disc ml-5 space-y-1">
+                                <li><strong>If expenses exceed income:</strong> You find ways to reduce spending to match income (no debt accumulation, but zero savings)</li>
+                                <li><strong>If income exceeds expenses:</strong> You save 50% of surplus in cash, invest 5% for retirement, and spend 45% on lifestyle upgrades</li>
+                              </ul>
+                              <p className="text-sm text-yellow-800 mt-3 font-semibold">This reflects real-world behavior where people adjust spending based on available income.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-3 mt-6">
+                          {activeTab > 0 && (
+                            <button onClick={() => setActiveTab(activeTab - 1)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
+                              ← Previous
+                            </button>
+                          )}
+                          {activeTab < 4 ? (
+                            <button onClick={() => setActiveTab(activeTab + 1)} className="flex-1 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">
+                              Next →
+                            </button>
+                          ) : (
+                            <button onClick={runSimulation} className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-bold text-lg">
+                              🚀 Run Simulation
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6">
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6">
+                        <h2 className="text-2xl font-bold text-green-900 mb-4">📊 Your Projected Outcomes</h2>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-white rounded-lg p-3 border-2 border-green-200">
+                            <p className="font-semibold text-gray-700 text-sm mb-1">College GPA</p>
+                            <p className="text-2xl font-bold text-green-700">{results.projectedGPA.toFixed(2)}</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-3 border-2 border-blue-200">
+                            <p className="font-semibold text-gray-700 text-sm mb-1">Starting Salary</p>
+                            <p className="text-2xl font-bold text-blue-700">${(results.startingSalary/1000).toFixed(0)}K</p>
+                            <p className="text-xs text-gray-600 mt-1">Age {results.startingAge}</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-3 border-2 border-orange-200">
+                            <p className="font-semibold text-gray-700 text-sm mb-1">Student Debt</p>
+                            <p className="text-2xl font-bold text-orange-700">${(results.totalDebt/1000).toFixed(0)}K</p>
+                          </div>
+
+                          <div className="bg-white rounded-lg p-3 border-2 border-purple-200">
+                            <p className="font-semibold text-gray-700 text-sm mb-1">Working Years</p>
+                            <p className="text-2xl font-bold text-purple-700">{results.workingYears}</p>
+                            <p className="text-xs text-gray-600 mt-1">To age 65</p>
+                          </div>
+                        </div>
+
+                        <NetWorthChart
+                          p10={results.netWorthP10}
+                          p50={results.netWorthP50}
+                          p90={results.netWorthP90}
+                          p10Today={results.netWorthP10Today}
+                          p50Today={results.netWorthP50Today}
+                          p90Today={results.netWorthP90Today}
+                        />
+
+                        <div className={`rounded-lg p-4 border-2 mb-6 ${results.netWorthAt65 >= 1000000 ? 'bg-green-50 border-green-400' : results.netWorthAt65 >= 0 ? 'bg-yellow-50 border-yellow-400' : 'bg-red-50 border-red-400'}`}>
+                          <p className="font-bold text-gray-700 mb-1">Net Worth at Age 65 — in Today's Dollars</p>
+                          <p className="text-xs text-gray-500 mb-3 italic">Future values adjusted for inflation at 3% over 48 years (~4.1× discount). This is what those dollars would buy in today's purchasing power.</p>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">P10 (Bottom 10%)</p>
+                              <p className="text-xl font-bold text-red-600">${(results.netWorthP10Today/1000).toFixed(0)}K</p>
+                              <p className="text-xs text-gray-400">(future: ${(results.netWorthP10/1000).toFixed(0)}K)</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">P50 (Most Likely)</p>
+                              <p className={`text-2xl font-bold ${results.netWorthAt65 >= 1000000 ? 'text-green-700' : results.netWorthAt65 >= 0 ? 'text-yellow-700' : 'text-red-700'}`}>${(results.netWorthP50Today/1000).toFixed(0)}K</p>
+                              <p className="text-xs text-gray-400">(future: ${(results.netWorthP50/1000).toFixed(0)}K)</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">P90 (Top 10%)</p>
+                              <p className="text-xl font-bold text-green-600">${(results.netWorthP90Today/1000).toFixed(0)}K</p>
+                              <p className="text-xs text-gray-400">(future: ${(results.netWorthP90/1000).toFixed(0)}K)</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-3">Investment balance + cumulative savings - student debt</p>
+                          {results.netWorthAt65 < 0 && (
+                            <p className="text-sm font-semibold text-red-800 mt-2">
+                              ⚠️ This means you would reach retirement age deeply in debt with no assets, unable to retire. This life path is not financially sustainable.
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-600 mt-2 italic">
+                            Note: Home equity not included. If you own a home at retirement, add $300K-$800K depending on location.
+                          </p>
+                        </div>
+
+                        <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
+                          <p className="font-bold text-red-900 mb-2">📉 Understanding the Negative Tail</p>
+                          <p className="text-sm text-red-800 mb-2">The portion of the red zone that falls <strong>to the left of $0 on the x-axis</strong> represents outcomes where you arrive at age 65 with more debt than assets — unable to retire without family support or government assistance. Red zone above $0 still represents low but positive net worth. This is not theoretical: roughly 25-30% of college graduates reach their 50s with little or no retirement savings.</p>
+                          <p className="text-sm text-red-800 mb-2"><strong>The curve doesn't show failure as a cliff — it's a slow slide.</strong> Student debt never fully paid off, consumer debt in lean years, divorce cutting wealth in half, and poor savings discipline compound quietly over decades.</p>
+                          <p className="text-sm text-red-800"><strong>The good news:</strong> Compounding works both ways. Living within your means and investing consistently — even small amounts — early in your career is what separates the left side of this curve from the right.</p>
+                        </div>
+
+                        <div className="bg-indigo-50 border-2 border-indigo-400 rounded-lg p-4 mb-4">
+                          <p className="font-bold text-indigo-900 mb-2">📈 Understanding Your Range</p>
+                          <p className="text-sm text-indigo-800 mb-2">The P10/P50/P90 range shows how much YOUR CHOICES and LUCK matter:</p>
+                          <ul className="text-sm text-indigo-800 list-disc ml-5 space-y-1">
+                            <li><strong>P10 (Bottom 10%):</strong> Poor execution or bad luck</li>
+                            <li><strong>P50 (Most Likely):</strong> Following your plan with average outcomes</li>
+                            <li><strong>P90 (Top 10%):</strong> Excellent execution and good luck</li>
+                          </ul>
+                          <p className="text-sm text-indigo-800 mt-3 font-semibold">You control: Attitude, continuous development, choosing fields that match your aptitude. Do these right and you may be able to overcome bad luck.</p>
+                        </div>
+
+                        <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4 mb-4">
+                          <p className="font-bold text-orange-900 mb-2">⚠️ CRITICAL ASSUMPTION: You WILL Find Ways to Live Within Your Means</p>
+                          <p className="text-sm text-orange-800 mb-2">This model assumes that if your living expenses exceed your after-tax income, you WILL make the difficult choices to reduce your spending to match your income. This might mean:</p>
+                          <ul className="text-sm text-orange-800 list-disc ml-5 space-y-1">
+                            <li>Living with roommates longer</li>
+                            <li>Delaying major purchases</li>
+                            <li>Choosing less expensive housing</li>
+                            <li>Cutting discretionary spending</li>
+                          </ul>
+                          <p className="text-sm text-orange-800 mt-3 mb-2"><strong>Reality check:</strong> This is NOT easy. Approximately 25-30% of college graduates fail to make these adjustments and instead accumulate consumer debt at 15-25% interest rates, which can devastate their financial future and reduce retirement net worth by 60-80%.</p>
+                          <p className="text-sm text-orange-800 font-semibold">Bottom line: The projections shown assume you WILL successfully live within your means. If you don't, your actual outcomes will be significantly worse.</p>
+                        </div>
+
+                        {results.showVocationalWarning && (
+                          <div className="bg-blue-50 border-2 border-blue-400 rounded p-4 mb-4">
+                            <p className="font-bold text-blue-900 mb-2">💼 Is a Traditional College Degree the Right Path For You?</p>
+                            <p className="text-sm text-blue-800 mb-2">College is not the only path to a successful career. This tool is showing financial stress signals that suggest a vocational or trade career could be a better fit. Consider this path seriously if your projected net worth is low, your debt exceeds your starting salary, your GPA projection is below 2.8, or your preferences lean toward hands-on work.</p>
+                            <p className="text-sm text-blue-800 font-semibold mb-1">Skilled Trades (Electrician, Plumber, HVAC, Welder, Carpenter):</p>
+                            <ul className="text-sm text-blue-800 list-disc ml-5 space-y-1">
+                              <li>No college debt — trade school costs $5K-$15K</li>
+                              <li>$60K-$90K starting income within 2-4 years</li>
+                              <li>Strong job security and high demand</li>
+                              <li>Potential net worth at 65: $800K-$1.2M in today's dollars</li>
+                            </ul>
+                            <p className="text-sm text-blue-800 mt-2 font-semibold">This is not a fallback — it is a financially smart, respected career choice that society depends on.</p>
+                          </div>
+                        )}
+
+                        {results.showMilitaryWarning && (
+                          <div className="bg-indigo-50 border-2 border-indigo-400 rounded p-4 mb-4">
+                            <p className="font-bold text-indigo-900 mb-2">🎖️ Consider Military Service</p>
+                            <p className="text-sm text-indigo-800 mb-2">If you are unsure about your career direction, or your college costs are difficult to manage on your family's income, the military offers a structured path — with pay, housing, healthcare, and education benefits included.</p>
+                            <ul className="text-sm text-indigo-800 list-disc ml-5 space-y-1">
+                              <li>Immediate income and housing from day one</li>
+                              <li>Training in a skilled, career-relevant field</li>
+                              <li>GI Bill benefits covering college tuition after service — debt free</li>
+                              <li>Strong professional network and leadership experience</li>
+                            </ul>
+                            <p className="text-sm text-indigo-800 mt-2 font-semibold">Many successful engineers, doctors, and business leaders began their careers in uniform. This option deserves serious consideration if you are not yet ready to commit to a college or trade path.</p>
+                          </div>
+                        )}
+
+                        {results.bankruptcyWarning && (
+                          <div className="bg-red-100 border-2 border-red-500 rounded p-4 mb-4">
+                            <p className="font-bold text-red-900 mb-2">🚨 BANKRUPTCY RISK WARNING</p>
+                            <p className="text-sm text-red-800 mb-2">Your cumulative debt has reached unsustainable levels. This lifestyle is not financially viable.</p>
+                            <p className="text-sm text-red-800 font-semibold">CONSIDER:</p>
+                            <ul className="text-sm text-red-800 list-disc ml-5 mt-1">
+                              <li>Selecting "Two-income household" if planning a working partner</li>
+                              <li>Choosing a higher-paying career field</li>
+                              <li>Improving self-discipline behaviors</li>
+                              <li>Delaying having children until debt is paid off</li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {tab5.dualIncome && (
+                          <div className="bg-orange-50 border-2 border-orange-400 rounded p-4 mb-4">
+                            <p className="font-bold text-orange-900 mb-2">⚠️ MARRIAGE & DIVORCE FINANCIAL IMPACT</p>
+                            <p className="text-sm text-orange-800 mb-2">You selected "Two-income household." Important statistics:</p>
+                            <ul className="text-sm text-orange-800 list-disc ml-5">
+                              <li>~40-45% of first marriages end in divorce</li>
+                              <li>~60% of second marriages end in divorce</li>
+                            </ul>
+                            <p className="text-sm text-orange-800 mt-2 font-semibold">Typical divorce consequences:</p>
+                            <ul className="text-sm text-orange-800 list-disc ml-5">
+                              <li>Loss of dual income (immediate 33% household income drop)</li>
+                              <li>Legal fees ($15K-$50K+)</li>
+                              <li>Asset division (~50% of accumulated wealth)</li>
+                              <li>Potential alimony/child support</li>
+                              <li>Retirement savings often reduced 40-60%</li>
+                            </ul>
+                            <p className="text-sm text-orange-800 mt-2 italic">This model assumes a stable marriage starting at age 27. Plan accordingly.</p>
+                          </div>
+                        )}
+
+                        <div className="mb-6">
+                          <button 
+                            onClick={() => setShowYearByYear(!showYearByYear)}
+                            className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+                          >
+                            {showYearByYear ? '📊 Hide' : '📊 View'} Year-by-Year Calculations
+                          </button>
+                        </div>
+
+                        {showYearByYear && yearByYear && (
+                          <div className="mb-6 overflow-x-auto">
+                            <h3 className="text-xl font-bold text-gray-800 mb-3">Year-by-Year Financial Projection</h3>
+                            <p className="text-sm text-gray-600 mb-2">Working {results.workingYears} years (age {results.startingAge} to 65)</p>
+                            <table className="w-full text-sm border-collapse border border-gray-300">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="border border-gray-300 px-2 py-2">Year</th>
+                                  <th className="border border-gray-300 px-2 py-2">Age</th>
+                                  <th className="border border-gray-300 px-2 py-2">Gross Salary</th>
+                                  <th className="border border-gray-300 px-2 py-2">After-Tax</th>
+                                  <th className="border border-gray-300 px-2 py-2">Loan Pay</th>
+                                  <th className="border border-gray-300 px-2 py-2">Base Living</th>
+                                  <th className="border border-gray-300 px-2 py-2">Housing×</th>
+                                  <th className="border border-gray-300 px-2 py-2">Child Cost</th>
+                                  <th className="border border-gray-300 px-2 py-2">Total Living</th>
+                                  <th className="border border-gray-300 px-2 py-2">Discretionary</th>
+                                  <th className="border border-gray-300 px-2 py-2">Cash Save (50%)</th>
+                                  <th className="border border-gray-300 px-2 py-2">Invest (5%)</th>
+                                  <th className="border border-gray-300 px-2 py-2">Addl Spend (45%)</th>
+                                  <th className="border border-gray-300 px-2 py-2">Cumulative Cash</th>
+                                  <th className="border border-gray-300 px-2 py-2">Today's $</th>
+                                  <th className="border border-gray-300 px-2 py-2">Invest Balance</th>
+                                  <th className="border border-gray-300 px-2 py-2">Total Net Worth</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {yearByYear.map((row, idx) => (
+                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.year}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.age}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.grossSalary.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.afterTaxIncome.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.loanPayment.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.baseLiving.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-center">{row.housingMult}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.childCosts.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.totalLivingExpenses.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right ${row.discretionary === 0 ? 'bg-yellow-100' : ''}`}>${row.discretionary.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.cashSavings.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.amountInvested.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right">${row.additionalSpending.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right font-semibold ${row.cumulativeCash < 0 ? 'bg-red-100 text-red-700' : 'bg-green-50 text-green-700'}`}>${row.cumulativeCash.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right font-semibold ${row.cumulativeCashToday < 0 ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>${row.cumulativeCashToday.toLocaleString()}</td>
+                                    <td className="border border-gray-300 px-2 py-1 text-right text-purple-700">${row.investmentBalance.toLocaleString()}</td>
+                                    <td className={`border border-gray-300 px-2 py-1 text-right font-bold ${row.totalNetWorth < 0 ? 'bg-red-100 text-red-700' : 'bg-purple-50 text-purple-700'}`}>${row.totalNetWorth.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <p className="text-xs text-gray-600 mt-2">
+                              <strong>Note:</strong> When Discretionary = $0 (yellow), living expenses were reduced to match income with zero savings.
+                              Cash Savings earn 1% interest. Investments earn 5% compound growth to retirement.
+                              Model assumes renting (Housing× = 1.15) until age 27, then home ownership (Housing× = 1.0 with tax deduction) if selected.
+                              Dual income starts at age 27 if selected.
+                              <strong className="text-blue-700"> "Today's $" shows Cumulative Cash in current purchasing power (3% inflation).</strong>
+                              <strong className="text-purple-700"> "Total Net Worth" = Investment Balance + Cumulative Cash - Student Debt. The final row at age 65 should match the P50 Net Worth shown above.</strong>
+                            </p>
+                          </div>
+                        )}
+
+                        {results.graduationYears === 5 && (
+                          <div className="bg-red-50 border-2 border-red-400 rounded p-4 mb-4">
+                            <p className="font-bold text-red-900 mb-2">🚨 5-YEAR DEGREE ALERT</p>
+                            <p className="text-sm">Your course selection strategy resulted in a 5-year degree. Extra year cost and lost earnings significantly impact your outcome. Switching to Proactive planning could save you $100K-$150K. Taking High School AP classes can also improve your chance of graduating in 4 years.</p>
+                          </div>
+                        )}
+
+                        {tab2.advancedDegree === "Bachelor's Degree Only" && (
+                          <div className="bg-blue-50 border border-blue-300 rounded p-4 mb-4">
+                            <p className="font-bold text-blue-900 mb-2">💡 Worth Exploring: Advanced Degree Impact</p>
+                            <p className="text-sm">An advanced degree in {tab2.degreeTarget} could significantly increase lifetime earnings. Research graduate programs and talk to professionals about whether additional education makes sense for your goals.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {careerFit && (
+                        <div className={`border-2 rounded-lg p-4 mb-6 ${careerFit.colorClass}`}>
+                          <p className="font-bold mb-2">Career-Work Preference Alignment</p>
+                          <p className="text-sm">{careerFit.message}</p>
+                          <p className="text-xs mt-3 italic">Note: This is ONE factor to consider. Your interests, skills, and passion matter more than preference matching. Use this as a conversation starter, not a decision maker.</p>
+                        </div>
+                      )}
+
+                      <div className="bg-yellow-50 border border-yellow-300 rounded p-4 mb-6">
+                        <p className="font-bold text-yellow-900 mb-2">💰 Income Reality Check</p>
+                        <p className="text-sm">Some fields naturally command higher salaries than others—this is market reality, not a judgment of value. {tab2.degreeTarget} has different salary ranges than other fields. <strong>However:</strong> Your happiness, skills, and passion matter more than the numbers. Being miserable in a high-paying job is the fastest path to underperformance and career failure. Choose a field where you can thrive, not just survive.</p>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 text-center">
+                        <p className="text-sm text-gray-600 mb-1">
+                          <span className="font-semibold">Questions, feedback, or found an issue?</span>
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          We'd love to hear from you — especially students, parents, and counselors using this tool.
+                        </p>
+                        <a
+                          href="mailto:collegecareercompass@gmail.com?subject=College Career Compass Feedback"
+                          className="inline-block mt-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold"
+                        >
+                          ✉️ Send Feedback
+                        </a>
+                        <p className="text-xs text-gray-400 mt-2">collegecareercompass@gmail.com</p>
+                      </div>
+
+                      <button onClick={() => { setShowResults(false); setActiveTab(0); }} className="w-full py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-lg">
+                        ← Start Over
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<CareerPlanner />, document.getElementById('root'));
+    </script>
+</body>
+</html>
